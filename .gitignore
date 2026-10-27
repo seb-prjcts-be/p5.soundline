@@ -1,0 +1,9 @@
+# Lokale voorbeeldtrack: rechten niet vastgelegd, dus niet in de repo
+brunk.mp3
+*.mp3
+*.wav
+*.ogg
+*.m4a
+*.flac
+Thumbs.db
+.DS_Store

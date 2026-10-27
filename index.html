@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>p5.soundline Lab</title>
+  <meta name="description" content="Laad een geluidsbestand, laat het lab de muziek ontleden met FFT (onsets, tempo, secties, pieken, stiltes) en krijg een p5.js-sketch met lege functies op de juiste tijdstippen in draw()." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Inter:wght@400;500&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css?v=1" />
+</head>
+<body>
+  <nav id="navbar" aria-label="Projectlinks">
+    <div class="nav-logo"><a href="./">p5.<span>soundline</span> Lab</a></div>
+    <ul class="nav-links">
+      <li><a href="./" class="active">Lab</a></li>
+      <li><a href="METHODE.md" target="_blank" rel="noopener">Methode</a></li>
+      <li><a href="README.md" target="_blank" rel="noopener">README</a></li>
+      <li><a href="https://seb-prjcts-be.github.io/p5.waves_lab/" target="_blank" rel="noopener">p5.waves Lab</a></li>
+    </ul>
+  </nav>
+
+  <div class="page-shell">
+    <!-- ───────────── Links: geluid en analyse ───────────── -->
+    <aside class="control-panel control-panel-left">
+      <div class="panel-title"><h1>p5.soundline Lab</h1><p class="lede">Van geluidsbestand naar een tijdgecodeerde lijst lege p5.js-functies.</p></div>
+
+      <section class="control-group">
+        <h2>Geluid</h2>
+        <label id="dropzone" class="dropzone" for="file-input">
+          <input id="file-input" type="file" accept="audio/*,.mp3,.wav,.ogg,.m4a,.flac" />
+          <span class="drop-title">Sleep een mp3 hierheen</span>
+          <span class="drop-sub">of klik om te kiezen · mp3, wav, ogg, m4a, flac</span>
+        </label>
+        <div class="file-meta" id="file-meta">Nog geen bestand.</div>
+        <div class="scene-actions">
+          <button id="load-example" type="button" class="badge-button" title="Laadt brunk.mp3 uit deze map">Voorbeeld: brunk.mp3</button>
+          <button id="open-about" type="button" class="badge-button">Over</button>
+        </div>
+        <div class="progress" id="progress" hidden><div class="progress-bar" id="progress-bar"></div><span id="progress-text">decoderen…</span></div>
+      </section>
+
+      <section class="control-group">
+        <h2>Spectrale analyse</h2>
+        <label><span class="label-text">FFT-grootte</span>
+          <select id="fft-size"><option>1024</option><option selected>2048</option><option>4096</option></select></label>
+        <label><span class="label-text">Hop (samples)</span>
+          <select id="hop"><option>256</option><option selected>512</option><option>1024</option></select></label>
+        <div class="hint" id="stft-hint">Tijdresolutie: 11,6 ms per frame bij 44,1 kHz.</div>
+        <button id="reanalyze" type="button" class="wide" disabled>Analyseer opnieuw</button>
+      </section>
+
+      <section class="control-group">
+        <h2>Onsets</h2>
+        <label><span class="label-text">Laag (20–150 Hz)</span><input id="sens-low" type="range" min="0" max="1" step="0.01" value="0.5" /><span class="value" data-for="sens-low">0.50</span></label>
+        <label><span class="label-text">Midden (150–2000 Hz)</span><input id="sens-mid" type="range" min="0" max="1" step="0.01" value="0.5" /><span class="value" data-for="sens-mid">0.50</span></label>
+        <label><span class="label-text">Hoog (2–16 kHz)</span><input id="sens-high" type="range" min="0" max="1" step="0.01" value="0.5" /><span class="value" data-for="sens-high">0.50</span></label>
+        <label><span class="label-text">Min. afstand (ms)</span><input id="onset-gap" type="range" min="30" max="400" step="5" value="80" /><span class="value" data-for="onset-gap">80</span></label>
+      </section>
+
+      <section class="control-group">
+        <h2>Tempo en beats</h2>
+        <label><span class="label-text">BPM-bereik</span>
+          <span class="pair"><input id="bpm-min" type="number" min="30" max="300" value="55" /> – <input id="bpm-max" type="number" min="30" max="300" value="210" /></span></label>
+        <label><span class="label-text">Voorkeur (BPM)</span><input id="bpm-prior" type="range" min="60" max="180" step="1" value="120" /><span class="value" data-for="bpm-prior">120</span></label>
+        <label><span class="label-text">Strakheid</span><input id="tightness" type="range" min="20" max="1000" step="10" value="300" /><span class="value" data-for="tightness">300</span></label>
+        <label><span class="label-text">Maatsoort</span><select id="meter"><option value="4" selected>4/4</option><option value="3">3/4</option><option value="2">2/4</option></select></label>
+        <div class="hint" id="tempo-hint">—</div>
+      </section>
+
+      <section class="control-group">
+        <h2>Secties</h2>
+        <label><span class="label-text">Kernel (s)</span><input id="section-kernel" type="range" min="3" max="24" step="1" value="10" /><span class="value" data-for="section-kernel">10</span></label>
+        <label><span class="label-text">Min. lengte (s)</span><input id="section-min" type="range" min="2" max="30" step="1" value="6" /><span class="value" data-for="section-min">6</span></label>
+        <label><span class="label-text">Gevoeligheid</span><input id="section-sens" type="range" min="0" max="1" step="0.01" value="0.5" /><span class="value" data-for="section-sens">0.50</span></label>
+      </section>
+
+      <section class="control-group">
+        <h2>Pieken, stiltes, drops</h2>
+        <label><span class="label-text">Aantal pieken</span><input id="peak-count" type="range" min="1" max="24" step="1" value="5" /><span class="value" data-for="peak-count">5</span></label>
+        <label><span class="label-text">Stilte onder (dB t.o.v. max)</span><input id="silence-drop" type="range" min="20" max="70" step="1" value="45" /><span class="value" data-for="silence-drop">45</span></label>
+        <label><span class="label-text">Drop vanaf (dB sprong)</span><input id="drop-db" type="range" min="3" max="20" step="0.5" value="8" /><span class="value" data-for="drop-db">8</span></label>
+      </section>
+    </aside>
+
+    <!-- ───────────── Midden: tijdlijn ───────────── -->
+    <main class="stage">
+      <div class="transport">
+        <button id="play" type="button" disabled>Afspelen</button>
+        <span class="time" id="time">00:00.000</span>
+        <span class="sep">/</span>
+        <span class="time" id="duration">00:00.000</span>
+        <span class="badge" id="bpm-badge">— BPM</span>
+        <label class="inline"><input id="follow" type="checkbox" checked /><span>Volg de afspeelkop</span></label>
+        <label class="inline"><span>Zoom</span><input id="zoom" type="range" min="0" max="6" step="0.01" value="0" /></label>
+        <span class="hint" id="view-hint">scroll = zoom · sleep = schuif · klik = spring</span>
+      </div>
+      <canvas id="overview" height="56"></canvas>
+      <canvas id="timeline" height="520"></canvas>
+      <div class="tooltip" id="tooltip" hidden></div>
+      <div class="stats" id="stats">Laad een geluidsbestand om te beginnen. Alles gebeurt lokaal in de browser; er wordt niets verstuurd.</div>
+      <audio id="audio" preload="auto"></audio>
+    </main>
+
+    <!-- ───────────── Rechts: sketch ───────────── -->
+    <aside class="control-panel control-panel-right">
+      <section class="control-group">
+        <h2>Sketch</h2>
+        <label><span class="label-text">Stijl</span>
+          <select id="gen-style"><option value="timeline" selected>tijdlijn: elke cue als regel in draw()</option><option value="compact">compact: cuelijst + lus</option></select></label>
+        <label><span class="label-text">Functienamen</span>
+          <select id="gen-names"><option value="en" selected>Engels (section_1, low_012)</option><option value="nl">Nederlands (sectie_1, laag_012)</option></select></label>
+        <label><span class="label-text">Houd slag-cue (s)</span><input id="gen-hold" type="range" min="0.05" max="2" step="0.05" value="0.25" /><span class="value" data-for="gen-hold">0.25</span></label>
+        <label><span class="label-text">Niveaucurves meegeven</span>
+          <select id="gen-curves"><option value="level" selected>alleen niveau</option><option value="all">niveau + laag/midden/hoog + helderheid</option><option value="none">geen</option></select></label>
+        <label class="inline"><input id="gen-hud" type="checkbox" checked /><span class="label-text">Tijdlijn-overlay (HUD) in de sketch</span></label>
+        <div class="include-grid" id="include-grid">
+          <!-- gevuld door app.js: één rij per cue-type met vinkje, telling en maximum -->
+        </div>
+      </section>
+
+      <section class="editor-section">
+        <div class="output-tabs" role="tablist">
+          <button class="output-tab active" data-tab="sketch" role="tab">sketch.js</button>
+          <button class="output-tab" data-tab="html" role="tab">index.html</button>
+          <button class="output-tab" data-tab="json" role="tab">score.json</button>
+          <button class="output-tab" data-tab="preview" role="tab">Preview</button>
+        </div>
+        <div class="editor-bar">
+          <span id="output-meta" class="hint">—</span>
+          <div class="editor-actions">
+            <button id="copy-output" type="button">Kopieer</button>
+            <button id="download-output" type="button">Download</button>
+            <button id="download-all" type="button" title="sketch.js, index.html en score.json">Alles</button>
+          </div>
+        </div>
+        <textarea id="output" class="output" readonly spellcheck="false" wrap="off" placeholder="Hier verschijnt de gegenereerde sketch."></textarea>
+        <div id="preview-pane" class="preview-pane" hidden>
+          <div class="preview-bar"><button id="preview-run" type="button">Start preview</button><span class="hint">De gegenereerde sketch draait hier met de HUD aan; klik in het canvas om te starten. Lege functies tekenen niets: de overlay toont welke cues actief zijn.</span></div>
+          <iframe id="preview-frame" title="Preview van de gegenereerde sketch" sandbox="allow-scripts allow-same-origin"></iframe>
+        </div>
+      </section>
+    </aside>
+  </div>
+
+  <div class="modal" id="about-modal" hidden>
+    <div class="modal-backdrop" data-close></div>
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="about-title">
+      <div class="modal-header"><h2 id="about-title">Over dit lab</h2><button class="modal-close" type="button" data-close aria-label="Sluiten">×</button></div>
+      <div class="modal-body">
+        <p>Het lab decodeert het bestand met de Web Audio API, mengt het naar mono en rekent een korte-tijd-Fourier-transformatie (STFT) uit over het hele nummer: één FFT per hop, met een Hann-venster. Dat is één keer rekenwerk; alle detectoren werken daarna op die frames en reageren meteen op de schuiven.</p>
+        <ul>
+          <li><b>Onsets</b> per band uit spectrale flux (half-golf gelijkgericht verschil van log-magnitudes), met adaptieve drempel en peak-picking.</li>
+          <li><b>Tempo</b> via autocorrelatie van de onset-envelop met een log-normale voorkeur; <b>beats</b> via dynamisch programmeren (Ellis 2007), zodat het raster kleine tempodrift volgt.</li>
+          <li><b>Maten</b>: de beatfase met de meeste lage energie wordt downbeat (4/4 aangenomen).</li>
+          <li><b>Secties</b> uit een zelfgelijkenismatrix van log-bandspectra met dambord-kernel (Foote 2000); grenzen snappen naar de dichtstbijzijnde maatstreep.</li>
+          <li><b>Pieken</b>, <b>stiltes</b> en <b>drops</b> uit de niveaucurve.</li>
+        </ul>
+        <p>De gegenereerde sketch bevat lege functies in tijdsvolgorde en roept ze vanuit <code>draw()</code> aan op de klok van het geluidsbestand. Zie <a href="METHODE.md" target="_blank" rel="noopener">METHODE.md</a> voor formules, keuzes en beperkingen.</p>
+      </div>
+    </div>
+  </div>
+
+  <script src="soundline-analysis.js?v=1"></script>
+  <script src="soundline-codegen.js?v=1"></script>
+  <script src="app.js?v=1"></script>
+</body>
+</html>
