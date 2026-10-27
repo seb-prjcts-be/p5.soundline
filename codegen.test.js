@@ -54,6 +54,39 @@ for (const style of ['timeline', 'compact']) {
     if (style === 'timeline' && names === 'en') require('fs').writeFileSync(__dirname + '/research/example-output.sketch.js', out.sketch);
   }
 }
+// ── Nieuwe opties: duur tot de volgende cue, sterktefilter, eigen lanes en MIDI.
+{
+  const all = { section: true, bar: true, beat: true, low: true, mid: true, high: true, peak: true, silence: true, drop: true };
+  const base = G.generate(score, { include: all });
+  const until = G.generate(score, { include: all, holdMode: 'untilNext', holdMax: 4 });
+  const lows = until.cues.filter((c) => c.type === 'low');
+  const noOverlap = lows.every((c, i) => i === lows.length - 1 || c.t + c.holdDur <= lows[i + 1].t + 1e-9);
+  check('untilNext: lage cues overlappen niet binnen hun lane', noOverlap && lows.length > 2, `${lows.length} lage cues, duren ${lows.slice(0, 3).map((c) => c.holdDur.toFixed(3)).join(', ')}`);
+  check('untilNext: draw() gebruikt during() met expliciete duur', /during\(t,\s*[\d.]+,\s*[\d.]+,\s*low_001\)/.test(until.sketch));
+  const strict = G.generate(score, { include: all, minStrength: 0.9 });
+  check('sterktefilter laat minder slag-cues door', strict.summary.cues < base.summary.cues && strict.cues.filter((c) => c.dur === 0).every((c) => c.strength >= 0.9), `${strict.summary.cues} < ${base.summary.cues}`);
+
+  const taps = [
+    { type: 'tap:kick', lane: 'kick', key: 'k', t: 1.234, dur: 0, index: 1, strength: 1, label: 'tik k · kick 1', raw: 1.3 },
+    { type: 'tap:kick', lane: 'kick', key: 'k', t: 2.5, dur: 0, index: 2, strength: 1, label: 'tik k · kick 2', raw: 2.56 },
+    { type: 'tap:Sfeer laag', lane: 'Sfeer laag', key: 's', t: 3, dur: 2.5, index: 1, strength: 1, label: 'tik s · Sfeer laag 1', raw: 3.05 },
+  ];
+  const withTaps = G.generate(score, { include: all, extraEvents: taps });
+  check('eigen lanes krijgen eigen functies', /function kick_001\(t, p, e\) \{\}/.test(withTaps.sketch) && /function sfeer_laag_001\(t, p, e\) \{\}/.test(withTaps.sketch), `${withTaps.summary.taps} eigen cues`);
+  check('eigen duur-cue staat als during() in draw()', /during\(t,\s*3,\s*2\.5,\s*sfeer_laag_001\)/.test(withTaps.sketch));
+  const js = JSON.parse(withTaps.json);
+  check('score.json bevat de taps met ruwe tijd en letters per sectie', js.taps.length === 3 && js.taps[0].raw === 1.3 && js.sections.every((x) => /^[A-Z]$/.test(x.letter)), js.sections.map((x) => x.letter).join(''));
+  let ok = true; try { new vm.Script(withTaps.sketch); } catch (e) { ok = false; }
+  check('sketch met eigen lanes is geldige JavaScript', ok);
+
+  // MIDI: header, één track, en evenveel note-on-berichten als cues.
+  const m = withTaps.midi, txt = (a, b) => String.fromCharCode(...m.slice(a, b));
+  const trackLen = (m[18] << 24) | (m[19] << 16) | (m[20] << 8) | m[21];   // kop 14 bytes, 'MTrk' 4, lengte 4
+  let noteOns = 0;
+  for (let i = 22; i < m.length - 2; i++) if ((m[i] & 0xf0) === 0x90 && m[i + 2] > 0 && (m[i - 1] & 0x80) === 0) noteOns++;
+  check('MIDI: geldige kop, tracklengte klopt, note-ons = cues', txt(0, 4) === 'MThd' && txt(14, 18) === 'MTrk' && 22 + trackLen === m.length && noteOns === withTaps.summary.cues, `${m.length} bytes, ${noteOns} note-ons, ${withTaps.summary.cues} cues`);
+}
+
 const parsed = JSON.parse(G.generate(score, {}).json);
 check('score.json is geldige JSON met secties en curves', Array.isArray(parsed.sections) && parsed.curves.level.length > 0);
 console.log(fails ? `\n${fails} controle(s) mislukt` : '\nalle controles geslaagd');

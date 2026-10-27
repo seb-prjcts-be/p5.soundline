@@ -2,14 +2,17 @@
 
 Laad een geluidsbestand, laat het lab de muziek ontleden en krijg een p5.js-sketch terug met **lege functies op de juiste tijdstippen in `draw()`**. Jij vult de functies; het lab levert de tijdlijn.
 
-Open [http://localhost/p5.soundline/](http://localhost/p5.soundline/) op de lokale server. Er is geen buildstap en geen netwerk nodig behalve de Google-fonts; het rekenwerk gebeurt volledig in de browser en er wordt niets verstuurd. `brunk.mp3` in deze map dient als voorbeeld (knop **Voorbeeld: brunk.mp3**).
+Open [http://localhost/p5.soundline/](http://localhost/p5.soundline/) op de lokale server. Er is geen buildstap en geen netwerk nodig behalve de Google-fonts; het rekenwerk gebeurt volledig in de browser en er wordt niets verstuurd. Een `brunk.mp3` naast `index.html` dient als voorbeeld (knop **Voorbeeld: brunk.mp3**); het bestand staat niet in de repository.
+
+Repository: [github.com/seb-prjcts-be/p5.soundline](https://github.com/seb-prjcts-be/p5.soundline).
 
 ## Wat het lab doet
 
 1. **Decoderen** met de Web Audio API en mengen naar mono.
 2. **STFT** over het hele bestand (Hann-venster, standaard 2048/512): één FFT per hop. Dit gebeurt één keer; alle detectoren werken daarna op de bewaarde frames en reageren meteen op de schuiven.
-3. **Detectoren**: onsets in drie banden (laag, midden, hoog), tempo en beats, maatstrepen, secties, luidste pieken, stiltes en drops.
-4. **Codegeneratie**: een `sketch.js` met een cue per gebeurtenis, een `index.html` om hem te draaien en een `score.json` met alle gevonden tijden en niveaucurves.
+3. **Detectoren**: onsets in drie banden (laag, midden, hoog), tempo met octaafcontrole en beats, maatstrepen, secties met A/B/A-letters, luidste pieken, stiltes en drops.
+4. **Tikken op gehoor**: tijdens het afspelen een letter of cijfer indrukken zet een cue in een eigen lane. Kort = slag, vasthouden = duur-cue, Backspace = laatste tik weg. Met reactiecorrectie (te kalibreren met een metronoom) en optioneel snappen naar de dichtstbijzijnde onset of beat. Eigen lanes krijgen een naam naar keuze en gaan als gewone cues mee.
+5. **Codegeneratie**: een `sketch.js` met een cue per gebeurtenis, een `index.html` om hem te draaien, een `score.json` met alle gevonden tijden en niveaucurves, en een `.mid` met alle gekozen cues als noten.
 
 De tijdlijn in het midden toont golfvorm, log-spectrogram, flux/nieuwheid/niveau en negen cue-lanen. Scrollen zoomt, slepen schuift, klikken springt; het overzicht bovenaan toont het hele nummer. De preview-tab draait de gegenereerde sketch met de HUD aan, zodat je ziet welke cues wanneer actief zijn, nog voor je iets getekend hebt.
 
@@ -33,7 +36,8 @@ function low_001(t, p, e) {}     // 00:00.512 · low onset 1 ●●●●
 ```
 
 - Elke functie krijgt `(t, p, e)`: `t` seconden sinds de start van de cue, `p` voortgang 0..1, `e.first` is `true` op het eerste frame van de cue.
-- Een **slag-cue** (`hit`) blijft `SOUNDLINE.hold` seconden actief (standaard 0,25 s); een **duur-cue** (`during`) loopt over de hele sectie of stilte.
+- Een **slag-cue** (`hit`) blijft `SOUNDLINE.hold` seconden actief (standaard 0,25 s), of met de optie *tot de volgende cue in dezelfde lane* precies tot de volgende; een **duur-cue** (`during`) loopt over de hele sectie, stilte of vastgehouden tik.
+- Per cue-type kies je of het meegaat, hoeveel er maximaal meegaan (sterkste eerst) en vanaf welke sterkte. Functienamen volgen de analyse-index, dus `low_017` blijft hetzelfde moment als je later minder cues meeneemt.
 - `soundlineLevel(t)` geeft het niveau 0..1 op elk moment, uit een meegeleverde curve (geen FFT in de sketch zelf). Met de optie *niveau + laag/midden/hoog + helderheid* ook `soundlineLevel(t, 'low')` enzovoort.
 - De klok is `audio.currentTime` van het geluidsbestand. Klik op het canvas of druk spatie om te starten en te pauzeren. Zonder bestand loopt de klok op `millis()`.
 - Stijl **compact** geeft dezelfde functies met een `CUES`-lijst en één lus in `draw()`.
@@ -50,6 +54,7 @@ De sketch is geschreven voor p5.js 2.x in globale modus en gebruikt geen p5.soun
 | `analysis.test.js` | modelcontrole met een synthetisch signaal met bekende waarheid |
 | `codegen.test.js` | controle dat de gegenereerde sketch geldig is en de cues op tijd vuren |
 | `vendor/p5-2.3.4.min.js` | lokale p5 voor de preview (gegenereerde `index.html` laadt p5 van jsDelivr) |
+| `.gitignore` | houdt geluidsbestanden buiten de repository |
 | `research/` | verificatie-uitvoer en een voorbeeldsketch |
 | `METHODE.md` | formules, keuzes, verificatie en beperkingen |
 
@@ -65,4 +70,4 @@ node codegen.test.js
 
 ## Beperkingen, kort
 
-Tempo kan een octaaf ernaast zitten (82 of 165 in plaats van 110); het vertrouwen staat ernaast en de voorkeur-BPM is instelbaar. Maten gaan uit van 4/4 (instelbaar 3/4, 2/4). Secties zijn grenzen in klankkleur en niveau, geen muzikale vormanalyse; de labels *intro*, *peak*, *lift*, *breakdown*, *outro* zijn hints op basis van niveau. Alles staat uitgebreider in [METHODE.md](METHODE.md).
+Tempo kan een octaaf ernaast zitten (82 of 165 in plaats van 110); de octaafcontrole vangt de duidelijke gevallen, het vertrouwen staat ernaast en de keuze (× ½, × 1, × 2) is met de hand te forceren. Maten gaan uit van 4/4 (instelbaar 3/4, 2/4). Secties zijn grenzen in klankkleur en niveau, geen muzikale vormanalyse; de letters komen uit gelijkenis tussen secties en de labels *intro*, *peak*, *lift*, *breakdown*, *outro* zijn hints op basis van niveau. Instellingen en eigen tikken staan in de localStorage van de browser, per bestand; wie ze wil bewaren downloadt `score.json`. Alles staat uitgebreider in [METHODE.md](METHODE.md).

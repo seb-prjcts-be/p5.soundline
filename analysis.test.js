@@ -63,6 +63,31 @@ check('events zijn chronologisch', score.events.every((e, i, a) => i === 0 || a[
 const strict = A.detect(frames, { onsetSensitivity: { low: 0.1, mid: 0.1, high: 0.1 } });
 check('lagere gevoeligheid geeft niet meer onsets', strict.onsets.low.length <= score.onsets.low.length && strict.onsets.high.length <= score.onsets.high.length, `${strict.onsets.low.length}/${score.onsets.low.length} laag, ${strict.onsets.high.length}/${score.onsets.high.length} hoog`);
 
+// ── Octaafcontrole: alleen kicks op 60 BPM. De voorkeur ligt bij 120, dus de schatter zegt 120;
+//    om de andere beat is dan leeg en de controle moet naar 60 terug.
+{
+  const d2 = 20, N2 = sr * d2, y = new Float32Array(N2);
+  for (let i = 0; i < N2; i++) y[i] = 0.003 * rnd();
+  for (let tt = 0.25; tt < d2; tt += 1) { const s0 = Math.round(tt * sr); for (let i = 0; i < 0.18 * sr && s0 + i < N2; i++) y[s0 + i] += 0.8 * Math.sin(2 * Math.PI * 55 * i / sr) * Math.exp(-i / (0.18 * sr) * 6); }
+  // Met een smalle voorkeur rond 120 kiest de schatter 120; de octaafcontrole moet dat terugdraaien.
+  const sc = A.detect(A.stft(y, sr), { bpmPrior: 120, bpmPriorOctaves: 0.35 });
+  check('octaafcontrole: schatter zegt 120 bij smalle voorkeur', Math.abs(sc.tempo.octave.estimatedBpm - 120) < 2, `${sc.tempo.octave.estimatedBpm.toFixed(1)} BPM`);
+  check('octaafcontrole: 60 BPM-signaal eindigt op 60 BPM', Math.abs(sc.tempo.bpm - 60) < 1.5, `${sc.tempo.bpm.toFixed(2)} BPM, geschat ${sc.tempo.octave.estimatedBpm.toFixed(1)}, keuze ${sc.tempo.octave.applied}, alternatie ${sc.tempo.octave.alternation.toFixed(2)}, salience ${sc.tempo.octave.salience.toFixed(2)}`);
+  const forced = A.detect(A.stft(y, sr), { bpmPrior: 120, bpmPriorOctaves: 0.35, tempoOctave: 'base' });
+  check('octaafkeuze "base" houdt de schatting', Math.abs(forced.tempo.bpm - forced.tempo.octave.estimatedBpm) < 0.01, `${forced.tempo.bpm.toFixed(1)}`);
+}
+// ── A/B/A-letters: drie delen van 10 s, het derde klinkt als het eerste.
+{
+  const d3 = 30, N3 = sr * d3, z = new Float32Array(N3);
+  for (let i = 0; i < N3; i++) z[i] = 0.003 * rnd();
+  const tone = (from, to, freqs, amp) => { for (let i = from * sr; i < to * sr; i++) { const tt = i / sr; let v = 0; for (const f of freqs) v += Math.sin(2 * Math.PI * f * tt); z[i] += amp * v / freqs.length; } };
+  tone(0, 10, [110, 220, 330], 0.3); tone(10, 20, [1500, 2300, 3100], 0.3); tone(20, 30, [110, 220, 330], 0.3);
+  for (let tt = 0; tt < d3; tt += 0.5) { const s0 = Math.round(tt * sr); for (let i = 0; i < 0.05 * sr && s0 + i < N3; i++) z[s0 + i] += 0.2 * rnd() * Math.exp(-i / (0.05 * sr) * 6); }
+  const sc = A.detect(A.stft(z, sr));
+  const letters = sc.sections.map((x) => x.letter).join('');
+  check('secties A B A krijgen de letters A B A', letters === 'ABA', `${letters} — ${sc.sections.map((x) => `${x.letter}:${x.start.toFixed(1)}–${x.end.toFixed(1)} sim ${x.similarity === null ? '-' : x.similarity.toFixed(2)}`).join(', ')}`);
+}
+
 require('fs').writeFileSync(__dirname + '/research/analysis-verification.json', JSON.stringify({
   date: new Date().toISOString(), frames: frames.count, frameRate: frames.frameRate, ms,
   tempo: score.tempo, onsets: { low: rl, high: rh }, beats: rb,

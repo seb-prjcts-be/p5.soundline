@@ -90,6 +90,18 @@ label.inline { display: flex; align-items: center; gap: 8px; }
 .preview-bar .hint { margin: 0; font-family: var(--sans); color: var(--ink-2); }
 #preview-frame { flex: 1; width: 100%; min-height: 420px; border: 0; background: #000; }
 
+/* Tikken */
+.tap-help { font-family: var(--sans); color: var(--ink-2); line-height: 1.5; margin: 0 0 8px; }
+.tap-help b { color: var(--ink); font-weight: 500; }
+.tap-lanes { display: flex; flex-direction: column; gap: 4px; margin: 8px 0; }
+.tap-lane { display: grid; grid-template-columns: 26px 1fr auto auto; gap: 8px; align-items: center; }
+.tap-lane .key { display: inline-block; width: 24px; height: 22px; line-height: 22px; text-align: center; font-family: var(--mono); font-size: 12px; background: var(--red); color: #fff; border-radius: 2px; text-transform: uppercase; }
+.tap-lane input[type=text] { background: var(--panel-2); border: 1px solid var(--line-2); padding: 3px 6px; font-family: var(--mono); font-size: 12px; min-width: 0; }
+.tap-lane .count { font-family: var(--mono); font-size: 12px; color: var(--ink-2); }
+.tap-lane button { padding: 2px 8px; font-size: 11.5px; }
+.include-grid .lane-name.own i { background: var(--red); }
+#tap-calib-result { margin: 0; align-self: center; }
+
 /* Modal */
 .modal { position: fixed; inset: 0; z-index: 20; display: flex; align-items: center; justify-content: center; }
 .modal[hidden] { display: none; }

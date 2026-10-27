@@ -68,7 +68,9 @@ score[τ] = (acf[τ] + 0,5·acf[2τ] + 0,25·acf[τ/2]) · prior(bpm)
 prior(bpm) = exp(−½ · (log2(bpm / bpmPrior) / σ)²)        bpmPrior = 120, σ = 1 octaaf
 ```
 
-De harmonische termen helpen het echte tempo te kiezen boven een subharmonische; de prior (Ellis 2007) lost de rest van de octaafambiguïteit op in het voordeel van de buurt van 120. De beste lag wordt parabolisch verfijnd. Het **vertrouwen** is `(score_max / score_gemiddeld − 1) / 6`, begrensd op 0..1: een scherpe piek geeft 1, een vlak spectrum geeft bijna 0. Het lab toont de vier beste kandidaten, omdat de juiste keuze bij muziek zonder duidelijke puls aan de maker is.
+De harmonische termen helpen het echte tempo te kiezen boven een subharmonische; de prior (Ellis 2007) lost de rest van de octaafambiguïteit op in het voordeel van de buurt van 120. De beste lag wordt parabolisch verfijnd.
+
+**Octaafcontrole.** Na de beat-tracking (§6) worden twee verhoudingen gemeten op de onset-envelop: de *salience* `mean(o op beats) / mean(o op tussenbeats)` en de *alternatie* `min(even, oneven) / max(even, oneven)` over de beats. Een salience onder 1,25 betekent dat er tussen de beats evenveel gebeurt als erop, en dan is het dubbele tempo plausibel; een alternatie onder 0,45 betekent dat om de andere beat leeg is, en dan is het halve tempo plausibel. In de stand *automatisch* wordt de periode dan gehalveerd of verdubbeld en worden de beats opnieuw getrackt; de schatting vóór de correctie blijft zichtbaar. De stand kan met de hand op × ½, × 1 of × 2 worden gezet. De test in §11 laat de schatter eerst bewust 120 zeggen op een signaal van 60 BPM en controleert dat de alternatie (0,00) dat terugdraait. Het **vertrouwen** is `(score_max / score_gemiddeld − 1) / 6`, begrensd op 0..1: een scherpe piek geeft 1, een vlak spectrum geeft bijna 0. Het lab toont de vier beste kandidaten, omdat de juiste keuze bij muziek zonder duidelijke puls aan de maker is.
 
 ## 6. Beats en maten
 
@@ -98,6 +100,8 @@ Een hoge `N[w]` betekent: wat vóór *w* komt lijkt op zichzelf, wat erna komt l
 
 **Labels.** Per sectie het gemiddelde niveau; ten opzichte van de luidste sectie: `loud` (≥ −3 dB), `mid`, `quiet` (≤ −12 dB). Hints: `intro` (eerste sectie, niet luid), `outro` (laatste, niet luid), `lift` (6 dB luider dan de vorige), `breakdown` (6 dB zachter), `peak` (luid zonder andere hint). Dit zijn niveauhints, geen vormanalyse.
 
+**Letters.** Elke sectie krijgt het gemiddelde van haar kenmerkvectoren, gecentreerd op het gemiddelde van het hele nummer. De cosinus tussen die gecentreerde vectoren zegt of twee secties op elkaar lijken; is de beste gelijkenis met een eerdere sectie minstens `sectionRepeatSim` (0,6), dan erft de sectie die letter, anders krijgt ze de volgende. Zo wordt A B A zichtbaar; de gelijkenis staat in `score.json`. Het centreren is nodig omdat ongecentreerde spectra van om het even welke twee secties al een cosinus boven 0,95 geven.
+
 ## 8. Pieken, stiltes, drops
 
 - **Stilte**: het 125 ms-gemiddelde niveau ligt onder `max(−60 dBFS, P99,5 − silenceDropDb)`, standaard 45 dB onder de top, gedurende minstens 400 ms.
@@ -121,6 +125,20 @@ Elke gebeurtenis wordt een cue met een eigen functie. Namen zijn `type_index`, m
 
 Twee stijlen. *Tijdlijn*: elke cue een regel in `draw()`, met sectiekoppen; dit is letterlijk een tijdgecodeerde functielijst in `draw`, leesbaar en bewerkbaar met de hand, maar lang bij veel beats. *Compact*: dezelfde functies, een `CUES`-lijst en één lus. In beide staan de lege functies in tijdsvolgorde met het tijdstip als commentaar.
 
+**Duur van slag-cues.** Vast (`holdSec`) of *tot de volgende cue in dezelfde lane*, begrensd op `holdMax` (4 s). In de tweede stand wordt elke slag een `during` met expliciete duur, zodat `p` van slag tot slag van 0 naar 1 loopt: handig voor alles wat tussen twee kicks moet uitdoven of groeien.
+
+**Keuze.** Per type aan/uit, een sterktefilter (`minStrength`, alleen voor slag-cues uit de analyse) en een maximum (sterkste eerst). De selectie staat ook in `score.json` onder `selected`, met functienaam, tijd en effectieve duur.
+
+**Eigen tikken.** Tikken komen als gebeurtenissen van het type `tap:<lane>` binnen via `extraEvents`. De functienaam is de lane-naam, opgeschoond tot een geldige identifier (`Sfeer laag` → `sfeer_laag_001`); de toets en de ruwe (ongecorrigeerde, ongesnapte) tijd blijven in `score.json`. Eigen lanes staan standaard aan en vallen buiten het sterktefilter: wat de maker tikte, telt.
+
+**MIDI.** Dezelfde selectie als een standaard-MIDI-bestand (formaat 0, 480 ticks per kwart, tempo-meta uit de analyse). Slag-cues op kanaal 10: kick 36, snare 38, hi-hat 42, beat 37, maat 49, piek 57, drop 55; aanslag uit de sterkte. Secties als gehouden noten vanaf C3 per letter, stiltes als C2, eigen lanes vanaf C5, op kanaal 1. Daarmee is de tijdlijn ook in een DAW, in Processing of in een sequencer te gebruiken.
+
+### Tikken op gehoor
+
+Een toets indrukken tijdens het afspelen legt `audio.currentTime − reactiecorrectie` vast; loslaten na minstens 200 ms maakt er een duur-cue van. Elke toets is een lane met een vrije naam. De reactiecorrectie is de systematische vertraging van de speler: het lab meet haar met acht klikken op 120 BPM uit de Web Audio-klok (de speler tikt mee, de mediaan van tik − klik wordt de correctie, begrensd op 0–300 ms). Daarnaast kan elke tik snappen naar de dichtstbijzijnde onset (alle banden) of beat binnen een tolerantie (standaard 60 ms); de ruwe tijd blijft bewaard. Backspace haalt de laatste tik weg. Tikken worden per bestand (naam en duur) in localStorage bewaard en gaan mee in `score.json`.
+
+Het punt van dit alternatief is niet precisie maar zeggenschap: de analyse hoort alles even hard, de maker hoort wat telt. Beide lijsten komen in dezelfde sketch terecht, in dezelfde vorm.
+
 ## 11. Verificatie
 
 **Synthetisch signaal** (`node analysis.test.js`, uitvoer in `research/analysis-verification.json`): 24 s, 120 BPM, kick (55 Hz, 180 ms) op elke tel, hi-hat (ruis, 50 ms) op elke achtste, ruisbodem op −55 dBFS, een pad van 8 tot 15 s, stilte van 15 tot 17 s, daarna een vol signaal. Resultaten met standaardinstellingen:
@@ -140,19 +158,22 @@ De eerste versie faalde op dit signaal: de gaten tussen de slagen golden als sti
 
 **Gegenereerde sketch** (`node codegen.test.js`): voor beide stijlen en beide naamtalen is de sketch geldige JavaScript, heeft elke cue in `draw()` precies één lege functie, zijn de namen uniek, en vuurt de eerste lage onset in een gesimuleerde p5-omgeving op de twee frames binnen de houdtijd en niet daarbuiten, met `e.first` één keer waar. Deze test vond een echte fout: in de compacte stijl kregen slag-cues duur 0 en vuurden ze nooit.
 
-**brunk.mp3 in de browser** (Chromium in de desktop-app, 1680 × 1000): 1:57,5 bij 48 kHz, 11 016 frames op 93,8 fps; FFT 0,95 s, detectie 71 ms; 489 cues in de standaardselectie. Tempo 164,9 BPM met vertrouwen 0,13 en kandidaten 165,4 / 110,3 / 82,7 / 122,3: het nummer heeft geen duidelijke puls en het lab zegt dat ook. Twee secties (de lange hoofdsectie en een outro na 1:52), ook bij gevoeligheid 0,85: de klankkleur verandert weinig. De preview draait de gegenereerde sketch met p5 2.3.4 en de HUD.
+**Octaafcontrole, letters, opties** (`node analysis.test.js`, `node codegen.test.js`, uitgebreid op 27 oktober 2026): een signaal van 60 BPM met een smalle voorkeur rond 120 wordt eerst op 120,2 geschat en door de alternatie (0,00) naar 60,1 gezet; met de stand × 1 blijft 120,2. Drie delen van 10 s waarvan het derde als het eerste klinkt krijgen A B A (gelijkenis 1,00 en −1,00). In de generator overlappen cues met *tot de volgende* niet binnen hun lane, laat het sterktefilter minder cues door, krijgen eigen lanes eigen functies (`kick_001`, `sfeer_laag_001`) en een `during` met de vastgehouden duur, en is het MIDI-bestand geldig (kop, tracklengte, evenveel note-ons als cues).
+
+**brunk.mp3 in de browser** (Chromium in de desktop-app, 1680 × 1000): 1:57,5 bij 48 kHz, 11 016 frames op 93,8 fps; FFT 0,95 s, detectie 71 ms; 489 cues in de standaardselectie. Tempo 164,9 BPM met vertrouwen 0,13 en kandidaten 165,4 / 110,3 / 82,7 / 122,3: het nummer heeft geen duidelijke puls en het lab zegt dat ook. De octaafcontrole houdt de schatting (salience 2,05, alternatie 0,87). Twee secties, A en B (de lange hoofdsectie en een outro na 1:52), ook bij gevoeligheid 0,85: de nieuwheidscurve is vlak op de outro na. De preview draait de gegenereerde sketch met p5 2.3.4 en de HUD. Tikken tijdens het afspelen (twee korte op `k`, één vastgehouden op `s`) leverden drie eigen cues, `k_001`, `k_002` en `s_001` met duur 0,71 s, bewaard in localStorage en aanwezig in de sketch; Backspace haalde de laatste weer weg.
 
 **Niet geverifieerd.** Er is niet geluisterd of de onsets van brunk.mp3 muzikaal kloppen; recall en precisie op echte muziek zijn onbekend. Andere browsers, mobiel en zeer lange bestanden (meer dan tien minuten; het spectrogram-beeld groeit lineair mee) zijn niet getest. De drop-detector is alleen op het synthetische signaal gecontroleerd.
 
 ## 12. Beperkingen en open vragen
 
-- **Octaafambiguïteit** blijft de zwakste plek van tempo. Een beat-synchrone tweede ronde (tempo opnieuw schatten op de gevonden beats) of een vergelijking van beat-sterktes op 1× en 2× kan helpen.
-- **Secties** reageren op klankkleur en niveau. Herhaling (couplet dat terugkomt) is zichtbaar in de zelfgelijkenismatrix maar wordt niet gebruikt; een padalgoritme over de matrix zou secties ook kunnen *benoemen* (A, B, A). Chroma-kenmerken zouden harmonische wendingen zichtbaar maken die nu wegvallen.
+- **Octaafambiguïteit** is met salience en alternatie alleen in de duidelijke gevallen opgelost; bij muziek met evenveel energie op als tussen de beats blijft de keuze aan de maker (stand × ½ / × 2).
+- **Secties** reageren op klankkleur en niveau. De letters vergelijken secties als geheel; een padalgoritme over de zelfgelijkenismatrix zou ook *gedeeltelijke* herhaling vinden. Chroma-kenmerken zouden harmonische wendingen zichtbaar maken die nu wegvallen.
 - **Harmonisch/percussief scheiden** (mediaanfilters over het spectrogram) zou de lage en hoge onsets zuiverder maken bij dichte mixen zoals brunk.mp3.
 - **Tempodrift** wordt gevolgd zolang hij klein is; ritardando of een live-opname vraagt om lokale tempo-schatting per sectie.
 - De gegenereerde sketch gebruikt het **HTML-audio-element** als klok. Dat is precies genoeg voor beeld op 60 fps (de fout ligt onder één frame), maar niet sample-nauwkeurig; wie geluid wil synthetiseren moet naar de Web Audio-klok.
-- De **duur van een slag-cue** is één getal voor alle cues. Een natuurlijker keuze is "tot de volgende cue in dezelfde lane" of een duur per type; beide zijn kleine wijzigingen in de generator.
-- **Export naar andere vormen** ligt voor de hand: een MIDI-bestand met noten op de cues, een `.pde` voor processing.waves, of een p5.waves-compositie waarin elke sectie een eigen golf krijgt.
+- De **duur van een slag-cue** is vast of tot de volgende in dezelfde lane; een duur per type is de volgende stap.
+- **Tikken** meten de speler én het nummer tegelijk. Een tweede ronde (dezelfde passage nog eens tikken en de spreiding tonen) zou laten zien hoe stabiel een tik is; nudgen van een tik met de muis ontbreekt nog.
+- **Export naar andere vormen**: MIDI is er; een `.pde` voor processing.waves of een p5.waves-compositie waarin elke sectie een eigen golf krijgt, ligt voor de hand.
 
 ## 13. Bronnen
 

@@ -236,8 +236,9 @@
     onsetPreMeanMs: 100, onsetPostMeanMs: 70,
     bpmMin: 55, bpmMax: 210, bpmPrior: 120, bpmPriorOctaves: 1.0,
     beatTightness: 300,
+    tempoOctave: 'auto',    // 'auto' | 'half' | 'base' | 'double': octaafkeuze na de schatting
     meter: 4,
-    sectionWindowSec: 0.5, sectionKernelSec: 10, sectionMinSec: 6, sectionSensitivity: 0.5,
+    sectionWindowSec: 0.5, sectionKernelSec: 10, sectionMinSec: 6, sectionSensitivity: 0.5, sectionRepeatSim: 0.6,
     peakCount: 5, peakMinGapSec: 6, peakWindowSec: 0.5,
     silenceDropDb: 45, silenceFloorDb: -60, silenceMinMs: 400,
     dropMinDb: 8, dropLookbackSec: 2, dropMinGapSec: 10,
@@ -402,7 +403,7 @@
     }
     const mx = Math.max(1e-9, ...novelty);
     for (let w = 0; w < nWin; w++) novelty[w] /= mx;
-    return { novelty, windowSec: p.sectionWindowSec, nWin, win };
+    return { novelty, windowSec: p.sectionWindowSec, nWin, win, feats };
   }
 
   function detect(frames, options) {
@@ -442,6 +443,30 @@
     // Tempo en beats
     const tempo = estimateTempo(frames.flux.all, fr, p);
     let beats = tempo.periodFrames ? trackBeats(frames.flux.all, fr, tempo.periodFrames, p.beatTightness) : [];
+    // Octaafcontrole. Salience: energie op de beats t.o.v. de tussenbeats (laag = er zit evenveel tussen,
+    // dus het dubbele tempo is plausibel). Alternatie: even t.o.v. oneven beats (laag = om de andere beat
+    // is leeg, dus het halve tempo is plausibel).
+    if (beats.length >= 8) {
+      const env = frames.flux.all;
+      let on = 0, off = 0, even = 0, odd = 0;
+      for (let i = 0; i < beats.length - 1; i++) {
+        const a = beats[i].frame, b = beats[i + 1].frame;
+        on += env[a]; off += env[Math.round((a + b) / 2)];
+        if (i % 2) odd += env[a]; else even += env[a];
+      }
+      const salience = on / (off + 1e-9);
+      const alternation = Math.min(even, odd) / (Math.max(even, odd) + 1e-9);
+      let auto = 'base';
+      if (salience < 1.25 && tempo.bpm * 2 <= p.bpmMax) auto = 'double';
+      else if (alternation < 0.45 && tempo.bpm / 2 >= p.bpmMin) auto = 'half';
+      const choice = p.tempoOctave === 'auto' ? auto : p.tempoOctave;
+      const factor = choice === 'double' ? 0.5 : choice === 'half' ? 2 : 1;
+      tempo.octave = { salience, alternation, auto, applied: choice, estimatedBpm: tempo.bpm };
+      if (factor !== 1) {
+        tempo.periodFrames *= factor; tempo.period *= factor; tempo.bpm /= factor;
+        beats = trackBeats(env, fr, tempo.periodFrames, p.beatTightness);
+      }
+    } else tempo.octave = { salience: 0, alternation: 1, auto: 'base', applied: 'base', estimatedBpm: tempo.bpm };
     beats = beats.filter((b) => !inSilence(b.frame));
     // Downbeat: de fase (0..meter-1) met de meeste lage energie/flux op de beats.
     let downbeatOffset = 0;
@@ -527,6 +552,26 @@
         if (s.level === 'loud' && !tags.length) tags.push('peak');
         s.tags = tags;
       }
+      // Letters: een sectie die lijkt op een eerdere (cosinus van de gecentreerde gemiddelde kenmerken)
+      // krijgt dezelfde letter. A B A' wordt zo zichtbaar zonder vormanalyse.
+      const F = nov.feats, dim = F.length ? F[0].length : 0;
+      const gmean = new Float64Array(dim);
+      for (const v of F) for (let k = 0; k < dim; k++) gmean[k] += v[k] / F.length;
+      const secVec = sections.map((s) => {
+        const a = Math.floor(s.startFrame / nov.win), b = Math.max(a + 1, Math.floor(s.endFrame / nov.win));
+        const v = new Float64Array(dim); let cnt = 0;
+        for (let w = a; w < b && w < F.length; w++) { for (let k = 0; k < dim; k++) v[k] += F[w][k] - gmean[k]; cnt++; }
+        for (let k = 0; k < dim; k++) v[k] /= cnt || 1;
+        return v;
+      });
+      const cos = (x, y) => { let d = 0, nx = 0, ny = 0; for (let k = 0; k < x.length; k++) { d += x[k] * y[k]; nx += x[k] * x[k]; ny += y[k] * y[k]; } return nx && ny ? d / Math.sqrt(nx * ny) : 0; };
+      let nextLetter = 0;
+      sections.forEach((s, i) => {
+        let best = -1, bi = -1;
+        for (let j = 0; j < i; j++) { const c = cos(secVec[i], secVec[j]); if (c > best) { best = c; bi = j; } }
+        s.similarity = bi >= 0 ? best : null;
+        s.letter = bi >= 0 && best >= p.sectionRepeatSim ? sections[bi].letter : String.fromCharCode(65 + (nextLetter++ % 26));
+      });
     }
 
     // Pieken (luidste momenten)
@@ -594,7 +639,7 @@
 
     // Eén chronologische gebeurtenislijst
     const events = [];
-    for (const s of sections) events.push({ type: 'section', t: s.start, dur: s.end - s.start, index: s.index, strength: 1, label: `sectie ${s.index} · ${s.level}${s.tags.length ? ' · ' + s.tags.join(', ') : ''}` });
+    for (const s of sections) events.push({ type: 'section', t: s.start, dur: s.end - s.start, index: s.index, strength: 1, label: `sectie ${s.index} · ${s.letter} · ${s.level}${s.tags.length ? ' · ' + s.tags.join(', ') : ''}` });
     for (const b of bars) events.push({ type: 'bar', t: b.t, dur: 0, index: b.index, strength: b.strength, label: `maat ${b.bar}` });
     for (const b of beats) events.push({ type: 'beat', t: b.t, dur: 0, index: b.index, strength: b.strength, label: `beat ${b.index} (maat ${b.bar}.${b.beatInBar})` });
     for (const lane of frames.laneNames) for (const o of onsets[lane]) events.push({ type: lane, t: o.t, dur: 0, index: o.index, strength: o.strength, label: `${lane} onset ${o.index}` });

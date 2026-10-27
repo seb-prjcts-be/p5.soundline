@@ -1,7 +1,7 @@
 /* ──────────────────────────────────────────────────────────────────────
    soundline · test.mp3
    gegenereerd 2026-10-27 door p5.soundline
-   duur 00:12.000 · 119.6 BPM (vertrouwen 1.00) · 4/4 aangenomen · 1 secties · 80 cues
+   duur 00:12.000 · 119.6 BPM (vertrouwen 1.00) · 4/4 aangenomen · 1 secties (A) · 80 cues
 
    Vul de lege functies onderaan. Elke functie wordt vanuit draw() aangeroepen op het
    tijdstip in de commentaarregel ernaast. Zet het geluidsbestand naast dit bestand en
@@ -14,7 +14,7 @@ const SOUNDLINE = {
   bpm: 119.62, beat: 0.5016, meter: 4,
   hud: true,        // false = tijdlijn-overlay verbergen
   hold: 0.25,        // seconden dat een slag-cue actief blijft (p loopt 0 → 1)
-  sections: [["0","12","1 loud peak"]],
+  sections: [["0","12","1 A loud peak"]],
   curves: {
     "hz":21.533203125,
     "level":[0.396,0.001,0,0,0,0,0,0,0,0,0.847,0.266,0,0,0,0,0,0,0,0,0.471,0.709,0.164,0,0,0,0,0,0,0,0,0.482,0.573,0.073,0,0,0,0,0,0,0,0,0.912,0.44,0.01,0,0,0,0,0,0,0,0,0.867,0.306,0,0,0,0,0,0,0,0,0.467,0.749,0.178,0,0,0,0,0,0,0,0,0.48,0.61,0.086,0,0,0,0,0,0,0,0,0.92,0.474,0.034,0,0,0,0,0,0,0,0,0.869,0.343,0,0,0,0,0,0,0,0,0.427,0.793,0.219,0,0,0,0,0,0,0,0,0.481,0.654,0.109,0,0,0,0,0,0,0,0,0.886,0.839,0.833,0.835,0.833,0.834,0.835,0.833,0.834,0.834,0.833,0.945,0.836,0.833,0.834,0.834,0.833,0.835,0.834,0.833,0.835,0.837,0.927,0.836,0.833,0.834,0.835,0.833,0.834,0.835,0.833,0.834,0.909,0.874,0.835,0.834,0.833,0.835,0.834,0.833,0.835,0.834,0.833,0.919,0.843,0.834,0.835,0.833,0.834,0.835,0.833,0.834,0.834,0.833,0.951,0.835,0.833,0.835,0.834,0.833,0.835,0.834,0.833,0.835,0.833,0.934,0.835,0.833,0.834,0.835,0.833,0.834,0.835,0.833,0.834,0.907,0.88,0.835,0.834,0.833,0.835,0.834,0.833,0.835,0.833,0.833,0.918,0.85,0.834,0.835,0.833,0.834,0.835,0.833,0.834,0.834,0.833,0.951,0.837,0.833,0.835,0.834,0.833,0.835,0.833,0.834,0.835,0.833,0.934,0.835,0.833,0.834,0.835,0.833,0.834,0.834,0.833,0.834,0.896,0.897,0.835,0.834,0.833,0.835,0.834,0.833,0.835,0.833,0.834,0.776,0],
@@ -34,7 +34,7 @@ function draw() {
   background(12);
   const t = soundlineTime();        // seconden in het nummer, -1 vóór de start
 
-  during(t,        0,       12, section_1);  // 00:00.000 → 00:12.000 · sectie 1 · loud · peak
+  during(t,        0,       12, section_1);  // 00:00.000 → 00:12.000 · sectie 1 · A · loud · peak
   hit(t,    0.488, beat_001);                // 00:00.488 · beat 1 (maat 0.4) ●●●●
   hit(t,    0.488, low_001);                 // 00:00.488 · low onset 1 ●●●●
   hit(t,    0.488, mid_001);                 // 00:00.488 · mid onset 1 ●●●●
@@ -125,9 +125,9 @@ function draw() {
 // soundlineLevel(t) geeft het niveau 0..1 op elk moment; soundlineLevel(t, 'low'|'mid'|'high'|'centroid') ook.
 
 // secties (duur-cues: p loopt van 0 naar 1 over de hele sectie) · 1
-function section_1(t, p, e) {} // 00:00.000 → 00:12.000 · sectie 1 · loud · peak
+function section_1(t, p, e) {} // 00:00.000 → 00:12.000 · sectie 1 · A · loud · peak
 
-// maatstrepen (downbeats, 4/4 aangenomen) · 6
+// maatstrepen (downbeats, maatsoort aangenomen) · 6
 function bar_001(t, p, e) {}   // 00:00.998 · maat 1 ●●●●
 function bar_002(t, p, e) {}   // 00:02.995 · maat 2 ●●●●
 function bar_003(t, p, e) {}   // 00:04.992 · maat 3 ●●●●

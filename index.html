@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Inter:wght@400;500&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="style.css?v=1" />
+  <link rel="stylesheet" href="style.css?v=2" />
 </head>
 <body>
   <nav id="navbar" aria-label="Projectlinks">
@@ -65,6 +65,7 @@
           <span class="pair"><input id="bpm-min" type="number" min="30" max="300" value="55" /> – <input id="bpm-max" type="number" min="30" max="300" value="210" /></span></label>
         <label><span class="label-text">Voorkeur (BPM)</span><input id="bpm-prior" type="range" min="60" max="180" step="1" value="120" /><span class="value" data-for="bpm-prior">120</span></label>
         <label><span class="label-text">Strakheid</span><input id="tightness" type="range" min="20" max="1000" step="10" value="300" /><span class="value" data-for="tightness">300</span></label>
+        <label><span class="label-text">Octaaf</span><select id="tempo-octave"><option value="auto" selected>automatisch (salience/alternatie)</option><option value="half">× ½ (half tempo)</option><option value="base">× 1 (schatting houden)</option><option value="double">× 2 (dubbel tempo)</option></select></label>
         <label><span class="label-text">Maatsoort</span><select id="meter"><option value="4" selected>4/4</option><option value="3">3/4</option><option value="2">2/4</option></select></label>
         <div class="hint" id="tempo-hint">—</div>
       </section>
@@ -81,6 +82,22 @@
         <label><span class="label-text">Aantal pieken</span><input id="peak-count" type="range" min="1" max="24" step="1" value="5" /><span class="value" data-for="peak-count">5</span></label>
         <label><span class="label-text">Stilte onder (dB t.o.v. max)</span><input id="silence-drop" type="range" min="20" max="70" step="1" value="45" /><span class="value" data-for="silence-drop">45</span></label>
         <label><span class="label-text">Drop vanaf (dB sprong)</span><input id="drop-db" type="range" min="3" max="20" step="0.5" value="8" /><span class="value" data-for="drop-db">8</span></label>
+      </section>
+
+      <section class="control-group tap-group">
+        <h2>Tikken op gehoor</h2>
+        <p class="hint tap-help">Speel af en druk een <b>letter of cijfer</b>: elke toets is een eigen lane. Kort tikken = slag-cue, vasthouden = duur-cue. <b>Backspace</b> haalt de laatste tik weg. Eigen lanes gaan als gewone cues mee in de sketch, rood in de tijdlijn.</p>
+        <label><span class="label-text">Reactiecorrectie (ms)</span><input id="tap-latency" type="range" min="0" max="300" step="5" value="0" /><span class="value" data-for="tap-latency">0</span></label>
+        <div class="scene-actions"><button id="tap-calibrate" type="button" class="badge-button" title="Acht klikken op 120 BPM; tik mee met een letter. De mediaan wordt de correctie.">Kalibreer met metronoom</button><span class="hint" id="tap-calib-result"></span></div>
+        <label><span class="label-text">Snap naar</span><select id="tap-snap"><option value="none" selected>niets (zoals getikt)</option><option value="onset">dichtstbijzijnde onset</option><option value="beat">dichtstbijzijnde beat</option></select></label>
+        <label><span class="label-text">Snap-tolerantie (ms)</span><input id="tap-snap-tol" type="range" min="10" max="200" step="5" value="60" /><span class="value" data-for="tap-snap-tol">60</span></label>
+        <div id="tap-lanes" class="tap-lanes"></div>
+        <div class="scene-actions"><button id="tap-undo" type="button" class="badge-button">Laatste tik weg</button><button id="tap-clear" type="button" class="badge-button">Alles wissen</button></div>
+      </section>
+
+      <section class="control-group">
+        <button id="reset-settings" type="button" class="wide" title="Alle schuiven en keuzes terug naar de standaardwaarden; eigen tikken blijven staan">Standaardwaarden</button>
+        <div class="hint">Instellingen en eigen tikken worden in deze browser bewaard (localStorage), per bestand.</div>
       </section>
     </aside>
 
@@ -111,7 +128,10 @@
           <select id="gen-style"><option value="timeline" selected>tijdlijn: elke cue als regel in draw()</option><option value="compact">compact: cuelijst + lus</option></select></label>
         <label><span class="label-text">Functienamen</span>
           <select id="gen-names"><option value="en" selected>Engels (section_1, low_012)</option><option value="nl">Nederlands (sectie_1, laag_012)</option></select></label>
+        <label><span class="label-text">Duur van een slag-cue</span>
+          <select id="gen-hold-mode"><option value="fixed" selected>vast aantal seconden</option><option value="untilNext">tot de volgende cue in dezelfde lane (max 4 s)</option></select></label>
         <label><span class="label-text">Houd slag-cue (s)</span><input id="gen-hold" type="range" min="0.05" max="2" step="0.05" value="0.25" /><span class="value" data-for="gen-hold">0.25</span></label>
+        <label><span class="label-text">Min. sterkte slag-cues</span><input id="gen-min-strength" type="range" min="0" max="1" step="0.01" value="0" /><span class="value" data-for="gen-min-strength">0.00</span></label>
         <label><span class="label-text">Niveaucurves meegeven</span>
           <select id="gen-curves"><option value="level" selected>alleen niveau</option><option value="all">niveau + laag/midden/hoog + helderheid</option><option value="none">geen</option></select></label>
         <label class="inline"><input id="gen-hud" type="checkbox" checked /><span class="label-text">Tijdlijn-overlay (HUD) in de sketch</span></label>
@@ -132,13 +152,14 @@
           <div class="editor-actions">
             <button id="copy-output" type="button">Kopieer</button>
             <button id="download-output" type="button">Download</button>
-            <button id="download-all" type="button" title="sketch.js, index.html en score.json">Alles</button>
+            <button id="download-midi" type="button" title="Alle gekozen cues als MIDI-noten (slagwerk op kanaal 10, secties en eigen lanes op kanaal 1)">MIDI</button>
+            <button id="download-all" type="button" title="sketch.js, index.html, score.json en MIDI">Alles</button>
           </div>
         </div>
         <textarea id="output" class="output" readonly spellcheck="false" wrap="off" placeholder="Hier verschijnt de gegenereerde sketch."></textarea>
         <div id="preview-pane" class="preview-pane" hidden>
           <div class="preview-bar"><button id="preview-run" type="button">Start preview</button><span class="hint">De gegenereerde sketch draait hier met de HUD aan; klik in het canvas om te starten. Lege functies tekenen niets: de overlay toont welke cues actief zijn.</span></div>
-          <iframe id="preview-frame" title="Preview van de gegenereerde sketch" sandbox="allow-scripts allow-same-origin"></iframe>
+          <iframe id="preview-frame" title="Preview van de gegenereerde sketch"></iframe>
         </div>
       </section>
     </aside>
@@ -156,14 +177,15 @@
           <li><b>Maten</b>: de beatfase met de meeste lage energie wordt downbeat (4/4 aangenomen).</li>
           <li><b>Secties</b> uit een zelfgelijkenismatrix van log-bandspectra met dambord-kernel (Foote 2000); grenzen snappen naar de dichtstbijzijnde maatstreep.</li>
           <li><b>Pieken</b>, <b>stiltes</b> en <b>drops</b> uit de niveaucurve.</li>
+          <li><b>Eigen tikken</b>: tijdens het afspelen een toets indrukken zet een cue in een eigen lane, met reactiecorrectie (kalibreerbaar met een metronoom) en optioneel snappen naar de dichtstbijzijnde onset of beat. Het oor van de maker telt even zwaar als de analyse.</li>
         </ul>
         <p>De gegenereerde sketch bevat lege functies in tijdsvolgorde en roept ze vanuit <code>draw()</code> aan op de klok van het geluidsbestand. Zie <a href="METHODE.md" target="_blank" rel="noopener">METHODE.md</a> voor formules, keuzes en beperkingen.</p>
       </div>
     </div>
   </div>
 
-  <script src="soundline-analysis.js?v=1"></script>
-  <script src="soundline-codegen.js?v=1"></script>
-  <script src="app.js?v=1"></script>
+  <script src="soundline-analysis.js?v=2"></script>
+  <script src="soundline-codegen.js?v=2"></script>
+  <script src="app.js?v=2"></script>
 </body>
 </html>
