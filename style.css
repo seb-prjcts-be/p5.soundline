@@ -100,6 +100,15 @@ label.inline { display: flex; align-items: center; gap: 8px; }
 .tap-lane input[type=text] { background: var(--panel-2); border: 1px solid var(--line-2); padding: 3px 6px; font-family: var(--mono); font-size: 12px; min-width: 0; }
 .tap-lane .count { font-family: var(--mono); font-size: 12px; color: var(--ink-2); }
 .tap-lane button { padding: 2px 8px; font-size: 11.5px; }
+.tap-lane button.key { padding: 0; border: none; cursor: pointer; }
+.tap-lane.active button.key { outline: 2px solid #fff; outline-offset: 1px; }
+.tap-detail { border-left: 2px solid var(--red); margin: 2px 0 8px 10px; padding: 6px 0 2px 10px; display: flex; flex-direction: column; gap: 6px; font-size: 12px; color: var(--ink-2); }
+.tap-detail-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.tap-detail-row input[type=number] { width: 64px; padding: 2px 4px; }
+.tap-detail-row button { padding: 2px 8px; font-size: 11.5px; }
+.take-list { display: flex; flex-direction: column; gap: 2px; margin: 6px 0; }
+.take { display: flex; align-items: center; gap: 8px; font-family: var(--mono); font-size: 11.5px; color: var(--ink); }
+.take button { padding: 0 6px; line-height: 16px; font-size: 12px; }
 .include-grid .lane-name.own i { background: var(--red); }
 #tap-calib-result { margin: 0; align-self: center; }
 .tap-selected { border-left: 2px solid var(--red); padding-left: 8px; font-family: var(--sans); color: var(--ink-2); line-height: 1.5; }

@@ -79,6 +79,33 @@
   function resizeTap(tap, dur) { tap.dur = Math.max(0, dur); if (tap.dur < 0.05) tap.dur = 0; tap.manual = true; return tap; }
   function resetTap(tap) { tap.manual = false; return recompute(tap); }
 
+  /* Verschuift een hele lane (alle tikken én hun takes) met dt seconden: een systematische
+     vertraging achteraf corrigeren. Handmatige tikken schuiven mee. */
+  function shiftLane(ln, dt, duration) {
+    const clampT = (t) => Math.max(0, Math.min(duration == null ? Infinity : duration, t));
+    for (const tap of ln.taps) {
+      tap.t = clampT(tap.t + dt);
+      if (tap.raw != null) tap.raw += dt;
+      for (const k of tap.takes) { k.t = clampT(k.t + dt); if (k.raw != null) k.raw += dt; }
+    }
+    return ln;
+  }
+  /* Meet hoe ver de tikken van een lane naast de dichtstbijzijnde doelen (onsets of beats) liggen.
+     Geeft de mediaan als voorstel voor shiftLane. */
+  function suggestShift(ln, targets, tolSec) {
+    const sorted = (targets || []).slice().sort((a, b) => a - b);
+    const offs = [];
+    for (const tap of ln.taps) {
+      let best = null, bd = tolSec + 1;
+      for (const x of sorted) { const d = Math.abs(x - tap.t); if (d < bd) { bd = d; best = x; } if (x > tap.t + tolSec) break; }
+      if (best != null && bd <= tolSec) offs.push(best - tap.t);
+    }
+    if (!offs.length) return { n: 0, total: ln.taps.length, shift: 0, medianMs: 0, meanMs: 0, sdMs: 0 };
+    offs.sort((a, b) => a - b);
+    const med = offs[Math.floor(offs.length / 2)], m = mean(offs);
+    return { n: offs.length, total: ln.taps.length, shift: med, medianMs: med * 1000, meanMs: m * 1000, sdMs: Math.sqrt(mean(offs.map((x) => (x - m) * (x - m)))) * 1000 };
+  }
+
   /* Spreiding van de takes: aantal, bereik en standaardafwijking in ms. */
   function spread(tap) {
     const ts = tap.takes.map((k) => k.t);
@@ -112,9 +139,12 @@
         const t = Math.max(0, Math.min(o.duration, tap.manual ? tap.t : snapTo(tap.t)));
         const sp = spread(tap);
         const info = sp.n > 1 ? ` ±${sp.sdMs.toFixed(0)} ms (${sp.n}×)` : '';
+        const meta = { key: ln.key, takes: sp.n, spread: +(sp.sdMs / 1000).toFixed(3) };
+        if (sp.n > 1) meta.range = +(sp.rangeMs / 1000).toFixed(3);
+        if (tap.manual) meta.manual = true;
         events.push({
           type: laneType(ln), lane: ln.label || ln.key, key: ln.key, t, dur: tap.dur || 0, index: i + 1, strength: 1,
-          raw: tap.raw, takes: sp.n, spreadMs: sp.sdMs, rangeMs: sp.rangeMs, manual: tap.manual, tap, laneKey: ln.key,
+          raw: tap.raw, takes: sp.n, spreadMs: sp.sdMs, rangeMs: sp.rangeMs, manual: tap.manual, tap, laneKey: ln.key, meta,
           label: `tik ${ln.key} · ${ln.label || ln.key} ${i + 1}${tap.dur ? ' (duur)' : ''}${tap.manual ? ' (hand)' : ''}${info}`,
         });
       });
@@ -123,6 +153,6 @@
     return events;
   }
 
-  const api = { DEFAULTS, normalize, lane, addTap, removeTake, removeTap, moveTap, resizeTap, resetTap, spread, laneStats, laneType, lanes, toEvents };
+  const api = { DEFAULTS, normalize, lane, addTap, removeTake, removeTap, moveTap, resizeTap, resetTap, shiftLane, suggestShift, spread, laneStats, laneType, lanes, toEvents };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.SoundlineTaps = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this);

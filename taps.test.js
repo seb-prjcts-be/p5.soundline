@@ -50,5 +50,22 @@ check('cues zijn chronologisch en dragen hun tik mee', evs.every((e, i, a) => (i
 T.resizeTap(rs.tap, 0.02);
 check('te korte duur wordt slag-cue', rs.tap.dur === 0 && rs.tap.manual);
 
+// Hele lane verschuiven: tikken, takes en ruwe tijden schuiven mee; voorstel uit de onsets is de mediaan.
+{
+  const st = T.normalize({ lanes: {} });
+  T.addTap(st, 'h', { t: 1.03, dur: 0, raw: 1.13 });
+  T.addTap(st, 'h', { t: 2.04, dur: 0, raw: 2.14 });
+  T.addTap(st, 'h', { t: 3.02, dur: 0, raw: 3.12 });
+  T.addTap(st, 'h', { t: 3.06, dur: 0, raw: 3.16 }, { mode: 'merge' });
+  T.addTap(st, 'h', { t: 7.00, dur: 0, raw: 7.1 });           // geen onset in de buurt
+  const sug = T.suggestShift(st.lanes.h, [1.0, 2.0, 3.0, 5.0], 0.1);
+  check('voorstel: 3 van 4 tikken gematcht, mediaan −40 ms', sug.n === 3 && sug.total === 4 && Math.abs(sug.medianMs - (-40)) < 1e-6, `n ${sug.n}, mediaan ${sug.medianMs.toFixed(1)} ms, gemiddeld ${sug.meanMs.toFixed(1)} ms`);
+  T.shiftLane(st.lanes.h, sug.shift, 100);
+  const first = st.lanes.h.taps[0], merged = st.lanes.h.taps[2];
+  check('verschuiven: tik, takes en raw schuiven mee', near(first.t, 0.99) && near(first.raw, 1.09) && near(merged.takes[0].t, 2.98) && near(merged.t, 3.00), `${first.t.toFixed(3)} / ${merged.t.toFixed(3)}`);
+  const ev = T.toEvents(st, { duration: 100 }).find((e) => e.tap === merged);
+  check('event draagt meta met key, takes en spread in seconden', ev.meta.key === 'h' && ev.meta.takes === 2 && near(ev.meta.spread, 0.02) && near(ev.meta.range, 0.04), JSON.stringify(ev.meta));
+}
+
 console.log(fails ? `\n${fails} controle(s) mislukt` : '\nalle controles geslaagd');
 process.exit(fails ? 1 : 0);

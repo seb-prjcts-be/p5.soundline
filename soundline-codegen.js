@@ -155,9 +155,20 @@
     ].join('\n');
 
     const explicitDur = (e) => e.dur > 0 || o.holdMode === 'untilNext' || Math.abs(e.holdDur - o.holdSec) > 1e-9;
-    const callFor = (e) => explicitDur(e)
-      ? `during(t, ${padNum(e.t, 8)}, ${padNum(e.holdDur, 8)}, ${nameOf(e)});`
-      : `hit(t, ${padNum(e.t, 8)}, ${nameOf(e)});`;
+    // meta: sterkte (getal) voor slag-cues uit de analyse; tik-info (object) voor eigen cues. Komt in e terecht.
+    const tapMeta = (e) => {
+      const m = { key: e.key || null, takes: e.takes || 1, spread: +(((e.spreadMs || 0) / 1000).toFixed(3)) };
+      if ((e.takes || 1) > 1) m.range = +(((e.rangeMs || 0) / 1000).toFixed(3));
+      if (e.manual) m.manual = true;
+      return '{' + Object.keys(m).map((k) => `${k}: ${JSON.stringify(m[k])}`).join(', ') + '}';
+    };
+    const metaOf = (e) => isTap(e.type) ? tapMeta(e) : INSTANT.has(e.type) ? num(e.strength, 2) : null;
+    const callFor = (e) => {
+      const meta = metaOf(e);
+      return explicitDur(e)
+        ? `during(t, ${padNum(e.t, 8)}, ${padNum(e.holdDur, 8)}, ${nameOf(e)}${meta !== null ? ', null, ' + meta : ''});`
+        : `hit(t, ${padNum(e.t, 8)}, ${nameOf(e)}${meta !== null ? ', ' + meta : ''});`;
+    };
 
     // draw()
     const drawLines = [];
@@ -166,7 +177,7 @@
     drawLines.push('  const t = soundlineTime();        // seconden in het nummer, -1 vóór de start');
     drawLines.push('');
     if (o.style === 'compact') {
-      drawLines.push('  for (const c of CUES) during(t, c[0], c[1] || SOUNDLINE.hold, c[2], c[3]);   // duur 0 = slag-cue');
+      drawLines.push('  for (const c of CUES) during(t, c[0], c[1] || SOUNDLINE.hold, c[2], c[3], c[4]);   // duur 0 = slag-cue');
     } else {
       let currentSection = -1;
       for (const e of cues) {
@@ -185,9 +196,10 @@
     drawLines.push('}');
 
     const cueList = o.style === 'compact'
-      ? ['// Cuelijst: [start, duur, functie, label]. duur 0 = slag-cue die SOUNDLINE.hold seconden actief blijft.',
+      ? ['// Cuelijst: [start, duur, functie, label, meta]. duur 0 = slag-cue die SOUNDLINE.hold seconden actief blijft;',
+        '// meta = sterkte (0..1) of, bij eigen tikken, { key, takes, spread, range, manual }.',
         'const CUES = [',
-        ...cues.map((e) => `  [${padNum(e.t, 8)}, ${padNum(explicitDur(e) ? e.holdDur : 0, 8)}, ${nameOf(e).padEnd(nameW)}, ${JSON.stringify(cueComment(e))}],`),
+        ...cues.map((e) => `  [${padNum(e.t, 8)}, ${padNum(explicitDur(e) ? e.holdDur : 0, 8)}, ${nameOf(e).padEnd(nameW)}, ${JSON.stringify(cueComment(e))}${metaOf(e) !== null ? ', ' + metaOf(e) : ''}],`),
         '];'].join('\n')
       : null;
 
@@ -195,7 +207,10 @@
     fnLines.push('// ' + '─'.repeat(20) + ' Lege functies, in tijdsvolgorde ' + '─'.repeat(20));
     fnLines.push('// Elke functie krijgt (t, p, e):');
     fnLines.push('//   t = seconden sinds de start van de cue, p = voortgang 0..1 binnen de cue,');
-    fnLines.push('//   e = { at, dur, name, label, first }  (e.first is true op het eerste frame van de cue).');
+    fnLines.push('//   e = { at, dur, name, label, first, strength }  (e.first is true op het eerste frame van de cue;');
+    fnLines.push('//        e.strength is de onset-sterkte 0..1, 1 voor secties en eigen tikken).');
+    fnLines.push('//   Eigen tikken hebben ook e.key (de toets), e.takes (aantal keer getikt), e.spread (standaardafwijking');
+    fnLines.push('//   van de takes in seconden: hoe zeker de tik is), e.range (bereik in s) en e.manual (met de hand gezet).');
     fnLines.push('// soundlineLevel(t) geeft het niveau 0..1 op elk moment' + (o.embedCurves === 'all' ? "; soundlineLevel(t, 'low'|'mid'|'high'|'centroid') ook." : '.'));
     fnLines.push('');
     for (const type of typesInOrder) {
@@ -229,13 +244,14 @@ function soundlineTime() {
   return _sl.audio.currentTime;
 }
 function soundlineSeek(seconds) { if (_sl.audio && !_sl.noAudio) _sl.audio.currentTime = seconds; else _sl.t0 = millis() - seconds * 1000; }
-function hit(t, at, fn, label) { return during(t, at, SOUNDLINE.hold, fn, label); }
-function during(t, at, dur, fn, label) {
+function hit(t, at, fn, meta) { return during(t, at, SOUNDLINE.hold, fn, null, meta); }
+function during(t, at, dur, fn, label, meta) {
   const name = fn.name || label || String(at);
   if (t < at || t > at + dur) { _sl.active.delete(name); return false; }
   const first = !_sl.active.has(name);
   _sl.active.set(name, t);
-  fn(t - at, dur > 0 ? Math.min(1, (t - at) / dur) : 1, { at, dur, name, label: label || name, first });
+  const info = typeof meta === 'number' ? { strength: meta } : (meta || {});
+  fn(t - at, dur > 0 ? Math.min(1, (t - at) / dur) : 1, Object.assign({ at, dur, name, label: label || name, first, strength: 1 }, info));
   return true;
 }
 function soundlineLevel(t, key = 'level') {

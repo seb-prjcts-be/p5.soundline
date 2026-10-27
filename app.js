@@ -28,6 +28,7 @@
     drag: null, raf: 0,
     taps: T.normalize({ lanes: {} }), tapEvents: [], tapDown: {}, undo: [], calib: null,
     selected: null,      // { key, tap } geselecteerde tik
+    activeLane: null,    // key van de lane waarvan het detailblok open staat
     tapDrag: null,       // { key, tap, mode: 'move' | 'resize', x0, t0, dur0, moved }
   };
 
@@ -154,12 +155,15 @@
   // ───────────────────────── Tikken op gehoor ─────────────────────────
   const tapLaneList = () => T.lanes(state.taps);
   /* Ruwe tikken → cues. Reactiecorrectie zit al in de tik; snappen gebeurt hier (niet voor handmatige). */
+  function targetsFor(kind) {
+    if (!state.score) return [];
+    if (kind === 'onset') return Object.values(state.score.onsets).flat().map((o) => o.t);
+    if (kind === 'beat') return state.score.beats.map((b) => b.t);
+    return [];
+  }
   function refreshTaps(redraw = true) {
-    const snap = $('tap-snap').value, tolSec = +$('tap-snap-tol').value / 1000;
-    let snapTargets = [];
-    if (state.score && snap === 'onset') snapTargets = Object.values(state.score.onsets).flat().map((o) => o.t);
-    if (state.score && snap === 'beat') snapTargets = state.score.beats.map((b) => b.t);
-    state.tapEvents = T.toEvents(state.taps, { snapTargets, tolSec, duration: state.duration || Infinity });
+    const tolSec = +$('tap-snap-tol').value / 1000;
+    state.tapEvents = T.toEvents(state.taps, { snapTargets: targetsFor($('tap-snap').value), tolSec, duration: state.duration || Infinity });
     renderTapLanes();
     if (redraw) { regenerate(); draw(); }
   }
@@ -209,8 +213,9 @@
     host.innerHTML = lanes.length ? '' : '<div class="hint">Nog geen tikken. Speel af en druk een letter of cijfer.</div>';
     for (const lane of lanes) {
       const st = T.laneStats(lane);
-      const row = document.createElement('div'); row.className = 'tap-lane';
-      const key = document.createElement('span'); key.className = 'key'; key.textContent = lane.key;
+      const row = document.createElement('div'); row.className = 'tap-lane' + (state.activeLane === lane.key ? ' active' : '');
+      const key = document.createElement('button'); key.type = 'button'; key.className = 'key'; key.textContent = lane.key; key.title = 'Lane-opties: hele lane verschuiven';
+      key.addEventListener('click', () => { state.activeLane = state.activeLane === lane.key ? null : lane.key; renderTapLanes(); });
       const label = document.createElement('input'); label.type = 'text'; label.value = lane.label; label.title = 'Naam van deze lane; wordt de functienaam in de sketch'; label.maxLength = 24;
       label.addEventListener('change', () => { const old = T.laneType(lane); lane.label = label.value.trim() || lane.key; for (const map of [state.include, state.maxPerType, state.holdPerType]) if (map[old] !== undefined) { map[T.laneType(lane)] = map[old]; delete map[old]; } saveTaps(); saveSettings(); refreshTaps(); });
       const count = document.createElement('span'); count.className = 'count';
@@ -220,13 +225,60 @@
       clear.addEventListener('click', () => { delete state.taps.lanes[lane.key]; state.undo = state.undo.filter((u) => u.key !== lane.key); if (state.selected && state.selected.key === lane.key) state.selected = null; saveTaps(); refreshTaps(); });
       row.append(key, label, count, clear);
       host.appendChild(row);
+      if (state.activeLane === lane.key) host.appendChild(renderLaneDetail(lane));
     }
+    renderSelected();
+  }
+
+  /* Detailblok van een lane: alles in één keer verschuiven, met de hand of gemeten tegen onsets of beats. */
+  function renderLaneDetail(lane) {
+    const box = document.createElement('div'); box.className = 'tap-detail';
+    const tolSec = +$('tap-snap-tol').value / 1000;
+    const apply = (dt) => { if (!dt) return; T.shiftLane(lane, dt, state.duration); saveTaps(); refreshTaps(); };
+    const row1 = document.createElement('div'); row1.className = 'tap-detail-row';
+    const lbl = document.createElement('span'); lbl.textContent = `lane ${lane.key} · ${lane.label}: alles verschuiven`;
+    const inp = document.createElement('input'); inp.type = 'number'; inp.step = 5; inp.value = 0; inp.title = 'milliseconden; negatief = vroeger';
+    const go = btn('toepassen', () => { apply((+inp.value || 0) / 1000); inp.value = 0; });
+    const minus = btn('−10 ms', () => apply(-0.01)), plus = btn('+10 ms', () => apply(0.01));
+    row1.append(lbl, inp, go, minus, plus);
+    box.appendChild(row1);
+    for (const kind of ['onset', 'beat']) {
+      const targets = targetsFor(kind); if (!targets.length) continue;
+      const sug = T.suggestShift(lane, targets, tolSec);
+      const row = document.createElement('div'); row.className = 'tap-detail-row';
+      const txt = document.createElement('span');
+      txt.textContent = sug.n ? `tegen ${kind === 'onset' ? 'onsets' : 'beats'}: ${sug.n} van ${sug.total} binnen ${(tolSec * 1000).toFixed(0)} ms · mediaan ${sug.medianMs >= 0 ? '+' : ''}${sug.medianMs.toFixed(0)} ms, spreiding ±${sug.sdMs.toFixed(0)} ms` : `tegen ${kind === 'onset' ? 'onsets' : 'beats'}: geen tik binnen ${(tolSec * 1000).toFixed(0)} ms`;
+      row.appendChild(txt);
+      if (sug.n && Math.abs(sug.medianMs) >= 1) row.appendChild(btn(`schuif ${sug.medianMs >= 0 ? '+' : ''}${sug.medianMs.toFixed(0)} ms`, () => apply(sug.shift)));
+      box.appendChild(row);
+    }
+    return box;
+  }
+  function btn(text, onClick) { const b = document.createElement('button'); b.type = 'button'; b.textContent = text; b.addEventListener('click', onClick); return b; }
+
+  /* Geselecteerde tik: samenvatting plus de afzonderlijke takes, elk met een verwijderknop. */
+  function renderSelected() {
     const sel = $('tap-selected');
-    if (state.selected) {
-      const tap = state.selected.tap, sp = T.spread(tap);
-      sel.hidden = false;
-      sel.textContent = `geselecteerd: ${state.taps.lanes[state.selected.key]?.label || state.selected.key} @ ${fmt(tap.t)}${tap.dur ? ` → ${fmt(tap.t + tap.dur)}` : ''}${sp.n > 1 ? ` · ${sp.n} takes, ±${sp.sdMs.toFixed(0)} ms` : ''}${tap.manual ? ' · met de hand gezet' : ''} — pijltjes = 10 ms (shift 100 ms), Delete = weg, R = terug naar gemiddelde, Esc = los`;
-    } else sel.hidden = true;
+    if (!state.selected || !state.taps.lanes[state.selected.key] || !state.taps.lanes[state.selected.key].taps.includes(state.selected.tap)) { state.selected = null; sel.hidden = true; return; }
+    const tap = state.selected.tap, sp = T.spread(tap), key = state.selected.key;
+    sel.hidden = false; sel.innerHTML = '';
+    const head = document.createElement('div');
+    head.textContent = `geselecteerd: ${state.taps.lanes[key].label} @ ${fmt(tap.t)}${tap.dur ? ` → ${fmt(tap.t + tap.dur)}` : ''}${sp.n > 1 ? ` · ${sp.n} takes, ±${sp.sdMs.toFixed(0)} ms` : ''}${tap.manual ? ' · met de hand gezet' : ''}`;
+    sel.appendChild(head);
+    if (sp.n > 0) {
+      const list = document.createElement('div'); list.className = 'take-list';
+      tap.takes.slice().sort((a, b) => a.t - b.t).forEach((take, i) => {
+        const row = document.createElement('div'); row.className = 'take';
+        const x = btn('×', () => { T.removeTake(state.taps, key, tap, take); state.undo = state.undo.filter((u) => u.take !== take); saveTaps(); refreshTaps(); });
+        x.title = 'deze take verwijderen';
+        const d = (take.t - (tap.manual ? sp.n > 1 ? (sp.min + sp.max) / 2 : take.t : tap.t)) * 1000;
+        const txt = document.createElement('span'); txt.textContent = `take ${i + 1} · ${fmt(take.t)}${sp.n > 1 ? ` (${d >= 0 ? '+' : ''}${d.toFixed(0)} ms)` : ''}${take.dur ? ` · duur ${take.dur.toFixed(2)} s` : ''}`;
+        row.append(x, txt); list.appendChild(row);
+      });
+      sel.appendChild(list);
+    }
+    const help = document.createElement('div'); help.className = 'hint'; help.textContent = 'pijltjes = 10 ms (shift 100 ms) · Delete = weg · R = terug naar gemiddelde · Esc = los';
+    sel.appendChild(help);
   }
 
   /* Kalibratie: acht klikken op 120 BPM uit de Web Audio-klok; de speler tikt mee met een willekeurige
@@ -455,9 +507,11 @@
           const x = xOf(e.t, w); if (x < -2 || x > w + 2) { if (!(e.dur > 0 && xOf(e.t + e.dur, w) > 0 && x < w)) continue; }
           const on = keys.has(`${e.type}@${e.t.toFixed(4)}`);
           const selected = lane.own && state.selected && state.selected.tap === e.tap;
-          if (lane.own && e.takes > 1) {   // spreiding van de takes als dunne balk
+          if (lane.own && e.takes > 1) {   // spreiding van de takes als dunne balk, elke take een streepje
             const sp = T.spread(e.tap);
             tctx.fillStyle = 'rgba(255,59,59,0.35)'; tctx.fillRect(xOf(sp.min, w), y + ROWS.lane - 3, Math.max(1, xOf(sp.max, w) - xOf(sp.min, w)), 2);
+            tctx.fillStyle = 'rgba(255,59,59,0.7)';
+            for (const k of e.tap.takes) tctx.fillRect(xOf(k.t, w), y + ROWS.lane - 5, 1, 4);
           }
           if (e.dur > 0) {
             const x2 = xOf(e.t + e.dur, w);

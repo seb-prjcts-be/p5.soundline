@@ -62,7 +62,7 @@ for (const style of ['timeline', 'compact']) {
   const lows = until.cues.filter((c) => c.type === 'low');
   const noOverlap = lows.every((c, i) => i === lows.length - 1 || c.t + c.holdDur <= lows[i + 1].t + 1e-9);
   check('untilNext: lage cues overlappen niet binnen hun lane', noOverlap && lows.length > 2, `${lows.length} lage cues, duren ${lows.slice(0, 3).map((c) => c.holdDur.toFixed(3)).join(', ')}`);
-  check('untilNext: draw() gebruikt during() met expliciete duur', /during\(t,\s*[\d.]+,\s*[\d.]+,\s*low_001\)/.test(until.sketch));
+  check('untilNext: draw() gebruikt during() met expliciete duur', /during\(t,\s*[\d.]+,\s*[\d.]+,\s*low_001(, null, [\d.]+)?\)/.test(until.sketch));
   const strict = G.generate(score, { include: all, minStrength: 0.9 });
   check('sterktefilter laat minder slag-cues door', strict.summary.cues < base.summary.cues && strict.cues.filter((c) => c.dur === 0).every((c) => c.strength >= 0.9), `${strict.summary.cues} < ${base.summary.cues}`);
 
@@ -73,7 +73,21 @@ for (const style of ['timeline', 'compact']) {
   ];
   const withTaps = G.generate(score, { include: all, extraEvents: taps });
   check('eigen lanes krijgen eigen functies', /function kick_001\(t, p, e\) \{\}/.test(withTaps.sketch) && /function sfeer_laag_001\(t, p, e\) \{\}/.test(withTaps.sketch), `${withTaps.summary.taps} eigen cues`);
-  check('eigen duur-cue staat als during() in draw()', /during\(t,\s*3,\s*2\.5,\s*sfeer_laag_001\)/.test(withTaps.sketch));
+  check('eigen duur-cue staat als during() in draw() met meta', /during\(t,\s*3,\s*2\.5,\s*sfeer_laag_001, null, \{key: "s", takes: 1, spread: 0\}\)/.test(withTaps.sketch), (withTaps.sketch.match(/during\(t,\s*3,.*$/m) || [''])[0]);
+  check('slag-cues uit de analyse geven hun sterkte mee', /hit\(t,\s*[\d.]+,\s*low_001, 0\.\d+\)|hit\(t,\s*[\d.]+,\s*low_001, 1\)/.test(withTaps.sketch));
+  // Simulatie: e.spread, e.takes en e.strength komen aan in de functie.
+  {
+    const calls = [];
+    const sb = { document: { querySelector: () => null }, window: { addEventListener() {} }, console, Audio: function () { return { addEventListener() {}, play: () => Promise.resolve(), paused: false, currentTime: 0 }; },
+      createCanvas() {}, background() {}, push() {}, pop() {}, resetMatrix() {}, noStroke() {}, textFont() {}, textSize() {}, textAlign() {}, fill() {}, rect() {}, text() {}, millis: () => 0, width: 800, height: 800, LEFT: 0, CENTER: 1, Math, Number, String, Map, JSON, Object, __calls: calls };
+    vm.createContext(sb);
+    vm.runInContext(withTaps.sketch + '\nsetup();', sb);
+    vm.runInContext('kick_001 = function (t, p, e) { __calls.push(["tap", e.key, e.takes, e.spread, e.strength]); }; low_001 = function (t, p, e) { __calls.push(["low", e.strength]); };', sb);
+    const low = withTaps.cues.find((c) => c.type === 'low');
+    vm.runInContext(`_sl.started = true; _sl.audio.currentTime = 1.24; draw(); _sl.audio.currentTime = ${Number(low.t.toFixed(3)) + 0.01}; draw();`, sb);
+    const tapCall = calls.find((c) => c[0] === 'tap'), lowCall = calls.find((c) => c[0] === 'low');
+    check('e bevat key, takes, spread en sterkte', tapCall && tapCall[1] === 'k' && tapCall[2] === 1 && tapCall[3] === 0 && tapCall[4] === 1 && lowCall && lowCall[1] > 0 && lowCall[1] <= 1, JSON.stringify(calls));
+  }
   const js = JSON.parse(withTaps.json);
   check('score.json bevat de taps met ruwe tijd en letters per sectie', js.taps.length === 3 && js.taps[0].raw === 1.3 && js.sections.every((x) => /^[A-Z]$/.test(x.letter)), js.sections.map((x) => x.letter).join(''));
   let ok = true; try { new vm.Script(withTaps.sketch); } catch (e) { ok = false; }
@@ -93,7 +107,7 @@ for (const style of ['timeline', 'compact']) {
   const per = G.generate(score, { include: all, holdSec: 0.25, holdPerType: { low: 0.6, beat: 0.1 } });
   const lows = per.cues.filter((c) => c.type === 'low'), beats = per.cues.filter((c) => c.type === 'beat'), highs = per.cues.filter((c) => c.type === 'high');
   check('duur per type: laag 0,6 s, beat 0,1 s, hoog valt terug op 0,25 s', lows.every((c) => c.holdDur === 0.6) && beats.every((c) => c.holdDur === 0.1) && highs.every((c) => c.holdDur === 0.25));
-  check('afwijkende duur staat expliciet als during() in draw()', /during\(t,\s*[\d.]+,\s*0\.6,\s*low_001\)/.test(per.sketch) && /hit\(t,\s*[\d.]+,\s*mid_001\)/.test(per.sketch));
+  check('afwijkende duur staat expliciet als during() in draw()', /during\(t,\s*[\d.]+,\s*0\.6,\s*low_001(, null, [\d.]+)?\)/.test(per.sketch) && /hit\(t,\s*[\d.]+,\s*mid_001(, [\d.]+)?\)/.test(per.sketch));
   const capped = G.generate(score, { include: all, holdMode: 'untilNext', holdPerType: { low: 0.3 } });
   check('bij "tot de volgende" is de duur per type het maximum', capped.cues.filter((c) => c.type === 'low').every((c) => c.holdDur <= 0.3 + 1e-9));
 }

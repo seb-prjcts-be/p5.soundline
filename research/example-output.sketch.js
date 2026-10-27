@@ -35,85 +35,85 @@ function draw() {
   const t = soundlineTime();        // seconden in het nummer, -1 vóór de start
 
   during(t,        0,       12, section_1);  // 00:00.000 → 00:12.000 · sectie 1 · A · loud · peak
-  hit(t,    0.488, beat_001);                // 00:00.488 · beat 1 (maat 0.4) ●●●●
-  hit(t,    0.488, low_001);                 // 00:00.488 · low onset 1 ●●●●
-  hit(t,    0.488, mid_001);                 // 00:00.488 · mid onset 1 ●●●●
-  hit(t,    0.975, mid_002);                 // 00:00.975 · mid onset 2 ●●●●
-  hit(t,    0.998, bar_001);                 // 00:00.998 · maat 1 ●●●●
-  hit(t,    0.998, beat_002);                // 00:00.998 · beat 2 (maat 1.1) ●●●●
-  hit(t,    0.998, low_002);                 // 00:00.998 · low onset 2 ●●●●
-  hit(t,    1.486, beat_003);                // 00:01.486 · beat 3 (maat 1.2) ●●●●
-  hit(t,    1.486, low_003);                 // 00:01.486 · low onset 3 ●●●●
-  hit(t,    1.486, mid_003);                 // 00:01.486 · mid onset 3 ●●●●
-  hit(t,    1.974, mid_004);                 // 00:01.974 · mid onset 4 ●●●●
-  hit(t,    1.997, beat_004);                // 00:01.997 · beat 4 (maat 1.3) ●●●●
-  hit(t,    1.997, low_004);                 // 00:01.997 · low onset 4 ●●●●
-  hit(t,    2.485, beat_005);                // 00:02.485 · beat 5 (maat 1.4) ●●●●
-  hit(t,    2.485, low_005);                 // 00:02.485 · low onset 5 ●●●●
-  hit(t,    2.485, mid_005);                 // 00:02.485 · mid onset 5 ●●●●
-  hit(t,    2.972, mid_006);                 // 00:02.972 · mid onset 6 ●●●●
-  hit(t,    2.995, bar_002);                 // 00:02.995 · maat 2 ●●●●
-  hit(t,    2.995, beat_006);                // 00:02.995 · beat 6 (maat 2.1) ●●●●
-  hit(t,    2.995, low_006);                 // 00:02.995 · low onset 6 ●●●●
-  hit(t,    3.483, beat_007);                // 00:03.483 · beat 7 (maat 2.2) ●●●●
-  hit(t,    3.483, low_007);                 // 00:03.483 · low onset 7 ●●●●
-  hit(t,    3.483, mid_007);                 // 00:03.483 · mid onset 7 ●●●●
-  hit(t,    3.971, mid_008);                 // 00:03.971 · mid onset 8 ●●●●
-  hit(t,    3.994, beat_008);                // 00:03.994 · beat 8 (maat 2.3) ●●●●
-  hit(t,    3.994, low_008);                 // 00:03.994 · low onset 8 ●●●●
-  hit(t,    4.481, beat_009);                // 00:04.481 · beat 9 (maat 2.4) ●●●●
-  hit(t,    4.481, low_009);                 // 00:04.481 · low onset 9 ●●●●
-  hit(t,    4.481, mid_009);                 // 00:04.481 · mid onset 9 ●●●●
-  hit(t,    4.969, mid_010);                 // 00:04.969 · mid onset 10 ●●●●
-  hit(t,    4.992, bar_003);                 // 00:04.992 · maat 3 ●●●●
-  hit(t,    4.992, beat_010);                // 00:04.992 · beat 10 (maat 3.1) ●●●●
-  hit(t,    4.992, low_010);                 // 00:04.992 · low onset 10 ●●●●
-  hit(t,     5.48, beat_011);                // 00:05.480 · beat 11 (maat 3.2) ●●●●
-  hit(t,     5.48, low_011);                 // 00:05.480 · low onset 11 ●●●●
-  hit(t,     5.48, mid_011);                 // 00:05.480 · mid onset 11 ●●●●
-  hit(t,    5.991, beat_012);                // 00:05.991 · beat 12 (maat 3.3) ●●●●
-  hit(t,    5.991, low_012);                 // 00:05.991 · low onset 12 ●●●●
-  hit(t,    5.991, mid_012);                 // 00:05.991 · mid onset 12 ●●●●
-  hit(t,     6.06, drop_1);                  // 00:06.060 · drop 1 (+34.9 dB)
-  hit(t,    6.478, beat_013);                // 00:06.478 · beat 13 (maat 3.4) ●●●●
-  hit(t,    6.478, low_013);                 // 00:06.478 · low onset 13 ●●●●
-  hit(t,    6.478, mid_013);                 // 00:06.478 · mid onset 13 ●●●●
-  hit(t,    6.989, bar_004);                 // 00:06.989 · maat 4 ●●●●
-  hit(t,    6.989, beat_014);                // 00:06.989 · beat 14 (maat 4.1) ●●●●
-  hit(t,    6.989, low_014);                 // 00:06.989 · low onset 14 ●●●●
-  hit(t,    6.989, mid_014);                 // 00:06.989 · mid onset 14 ●●●●
-  hit(t,    7.477, beat_015);                // 00:07.477 · beat 15 (maat 4.2) ●●●●
-  hit(t,    7.477, mid_015);                 // 00:07.477 · mid onset 15 ●●●●
-  hit(t,      7.5, low_015);                 // 00:07.500 · low onset 15 ●●●●
-  hit(t,    7.988, beat_016);                // 00:07.988 · beat 16 (maat 4.3) ●●●●
-  hit(t,    7.988, low_016);                 // 00:07.988 · low onset 16 ●●●●
-  hit(t,    7.988, mid_016);                 // 00:07.988 · mid onset 16 ●●●●
-  hit(t,    8.475, mid_017);                 // 00:08.475 · mid onset 17 ●●●●
-  hit(t,    8.499, beat_017);                // 00:08.499 · beat 17 (maat 4.4) ●●●●
-  hit(t,    8.499, low_017);                 // 00:08.499 · low onset 17 ●●●●
-  hit(t,    8.986, bar_005);                 // 00:08.986 · maat 5 ●●●●
-  hit(t,    8.986, beat_018);                // 00:08.986 · beat 18 (maat 5.1) ●●●●
-  hit(t,    8.986, low_018);                 // 00:08.986 · low onset 18 ●●●●
-  hit(t,    8.986, mid_018);                 // 00:08.986 · mid onset 18 ●●●●
-  hit(t,    9.474, mid_019);                 // 00:09.474 · mid onset 19 ●●●●
-  hit(t,    9.497, beat_019);                // 00:09.497 · beat 19 (maat 5.2) ●●●●
-  hit(t,    9.497, low_019);                 // 00:09.497 · low onset 19 ●●●●
-  hit(t,    9.985, beat_020);                // 00:09.985 · beat 20 (maat 5.3) ●●●●
-  hit(t,    9.985, low_020);                 // 00:09.985 · low onset 20 ●●●●
-  hit(t,    9.985, mid_020);                 // 00:09.985 · mid onset 20 ●●●●
-  hit(t,   10.495, beat_021);                // 00:10.495 · beat 21 (maat 5.4) ●●●●
-  hit(t,   10.495, low_021);                 // 00:10.495 · low onset 21 ●●●●
-  hit(t,   10.495, mid_021);                 // 00:10.495 · mid onset 21 ●●●●
-  hit(t,   10.983, bar_006);                 // 00:10.983 · maat 6 ●●●●
-  hit(t,   10.983, beat_022);                // 00:10.983 · beat 22 (maat 6.1) ●●●●
-  hit(t,   10.983, low_022);                 // 00:10.983 · low onset 22 ●●●●
-  hit(t,   10.983, mid_022);                 // 00:10.983 · mid onset 22 ●●●●
-  hit(t,   11.006, peak_1);                  // 00:11.006 · piek 1 (#1, -16.3 dB)
-  hit(t,   11.494, beat_023);                // 00:11.494 · beat 23 (maat 6.2) ●●●●
-  hit(t,   11.494, low_023);                 // 00:11.494 · low onset 23 ●●●●
-  hit(t,   11.494, mid_023);                 // 00:11.494 · mid onset 23 ●●●●
-  hit(t,   11.981, mid_024);                 // 00:11.981 · mid onset 24 ●●●●
-  hit(t,   12.005, beat_024);                // 00:12.005 · beat 24 (maat 6.3) ○○○○
+  hit(t,    0.488, beat_001, 1);             // 00:00.488 · beat 1 (maat 0.4) ●●●●
+  hit(t,    0.488, low_001, 1);              // 00:00.488 · low onset 1 ●●●●
+  hit(t,    0.488, mid_001, 0.97);           // 00:00.488 · mid onset 1 ●●●●
+  hit(t,    0.975, mid_002, 1);              // 00:00.975 · mid onset 2 ●●●●
+  hit(t,    0.998, bar_001, 1);              // 00:00.998 · maat 1 ●●●●
+  hit(t,    0.998, beat_002, 1);             // 00:00.998 · beat 2 (maat 1.1) ●●●●
+  hit(t,    0.998, low_002, 1);              // 00:00.998 · low onset 2 ●●●●
+  hit(t,    1.486, beat_003, 1);             // 00:01.486 · beat 3 (maat 1.2) ●●●●
+  hit(t,    1.486, low_003, 1);              // 00:01.486 · low onset 3 ●●●●
+  hit(t,    1.486, mid_003, 1);              // 00:01.486 · mid onset 3 ●●●●
+  hit(t,    1.974, mid_004, 1);              // 00:01.974 · mid onset 4 ●●●●
+  hit(t,    1.997, beat_004, 1);             // 00:01.997 · beat 4 (maat 1.3) ●●●●
+  hit(t,    1.997, low_004, 1);              // 00:01.997 · low onset 4 ●●●●
+  hit(t,    2.485, beat_005, 1);             // 00:02.485 · beat 5 (maat 1.4) ●●●●
+  hit(t,    2.485, low_005, 1);              // 00:02.485 · low onset 5 ●●●●
+  hit(t,    2.485, mid_005, 1);              // 00:02.485 · mid onset 5 ●●●●
+  hit(t,    2.972, mid_006, 1);              // 00:02.972 · mid onset 6 ●●●●
+  hit(t,    2.995, bar_002, 1);              // 00:02.995 · maat 2 ●●●●
+  hit(t,    2.995, beat_006, 1);             // 00:02.995 · beat 6 (maat 2.1) ●●●●
+  hit(t,    2.995, low_006, 1);              // 00:02.995 · low onset 6 ●●●●
+  hit(t,    3.483, beat_007, 1);             // 00:03.483 · beat 7 (maat 2.2) ●●●●
+  hit(t,    3.483, low_007, 1);              // 00:03.483 · low onset 7 ●●●●
+  hit(t,    3.483, mid_007, 1);              // 00:03.483 · mid onset 7 ●●●●
+  hit(t,    3.971, mid_008, 1);              // 00:03.971 · mid onset 8 ●●●●
+  hit(t,    3.994, beat_008, 1);             // 00:03.994 · beat 8 (maat 2.3) ●●●●
+  hit(t,    3.994, low_008, 1);              // 00:03.994 · low onset 8 ●●●●
+  hit(t,    4.481, beat_009, 1);             // 00:04.481 · beat 9 (maat 2.4) ●●●●
+  hit(t,    4.481, low_009, 1);              // 00:04.481 · low onset 9 ●●●●
+  hit(t,    4.481, mid_009, 1);              // 00:04.481 · mid onset 9 ●●●●
+  hit(t,    4.969, mid_010, 1);              // 00:04.969 · mid onset 10 ●●●●
+  hit(t,    4.992, bar_003, 1);              // 00:04.992 · maat 3 ●●●●
+  hit(t,    4.992, beat_010, 1);             // 00:04.992 · beat 10 (maat 3.1) ●●●●
+  hit(t,    4.992, low_010, 0.99);           // 00:04.992 · low onset 10 ●●●●
+  hit(t,     5.48, beat_011, 1);             // 00:05.480 · beat 11 (maat 3.2) ●●●●
+  hit(t,     5.48, low_011, 1);              // 00:05.480 · low onset 11 ●●●●
+  hit(t,     5.48, mid_011, 1);              // 00:05.480 · mid onset 11 ●●●●
+  hit(t,    5.991, beat_012, 1);             // 00:05.991 · beat 12 (maat 3.3) ●●●●
+  hit(t,    5.991, low_012, 0.97);           // 00:05.991 · low onset 12 ●●●●
+  hit(t,    5.991, mid_012, 1);              // 00:05.991 · mid onset 12 ●●●●
+  hit(t,     6.06, drop_1, 1);               // 00:06.060 · drop 1 (+34.9 dB)
+  hit(t,    6.478, beat_013, 1);             // 00:06.478 · beat 13 (maat 3.4) ●●●●
+  hit(t,    6.478, low_013, 1);              // 00:06.478 · low onset 13 ●●●●
+  hit(t,    6.478, mid_013, 1);              // 00:06.478 · mid onset 13 ●●●●
+  hit(t,    6.989, bar_004, 1);              // 00:06.989 · maat 4 ●●●●
+  hit(t,    6.989, beat_014, 1);             // 00:06.989 · beat 14 (maat 4.1) ●●●●
+  hit(t,    6.989, low_014, 0.99);           // 00:06.989 · low onset 14 ●●●●
+  hit(t,    6.989, mid_014, 0.94);           // 00:06.989 · mid onset 14 ●●●●
+  hit(t,    7.477, beat_015, 1);             // 00:07.477 · beat 15 (maat 4.2) ●●●●
+  hit(t,    7.477, mid_015, 1);              // 00:07.477 · mid onset 15 ●●●●
+  hit(t,      7.5, low_015, 1);              // 00:07.500 · low onset 15 ●●●●
+  hit(t,    7.988, beat_016, 1);             // 00:07.988 · beat 16 (maat 4.3) ●●●●
+  hit(t,    7.988, low_016, 1);              // 00:07.988 · low onset 16 ●●●●
+  hit(t,    7.988, mid_016, 0.93);           // 00:07.988 · mid onset 16 ●●●●
+  hit(t,    8.475, mid_017, 1);              // 00:08.475 · mid onset 17 ●●●●
+  hit(t,    8.499, beat_017, 1);             // 00:08.499 · beat 17 (maat 4.4) ●●●●
+  hit(t,    8.499, low_017, 1);              // 00:08.499 · low onset 17 ●●●●
+  hit(t,    8.986, bar_005, 1);              // 00:08.986 · maat 5 ●●●●
+  hit(t,    8.986, beat_018, 1);             // 00:08.986 · beat 18 (maat 5.1) ●●●●
+  hit(t,    8.986, low_018, 1);              // 00:08.986 · low onset 18 ●●●●
+  hit(t,    8.986, mid_018, 0.93);           // 00:08.986 · mid onset 18 ●●●●
+  hit(t,    9.474, mid_019, 1);              // 00:09.474 · mid onset 19 ●●●●
+  hit(t,    9.497, beat_019, 1);             // 00:09.497 · beat 19 (maat 5.2) ●●●●
+  hit(t,    9.497, low_019, 1);              // 00:09.497 · low onset 19 ●●●●
+  hit(t,    9.985, beat_020, 1);             // 00:09.985 · beat 20 (maat 5.3) ●●●●
+  hit(t,    9.985, low_020, 1);              // 00:09.985 · low onset 20 ●●●●
+  hit(t,    9.985, mid_020, 0.96);           // 00:09.985 · mid onset 20 ●●●●
+  hit(t,   10.495, beat_021, 1);             // 00:10.495 · beat 21 (maat 5.4) ●●●●
+  hit(t,   10.495, low_021, 1);              // 00:10.495 · low onset 21 ●●●●
+  hit(t,   10.495, mid_021, 0.99);           // 00:10.495 · mid onset 21 ●●●●
+  hit(t,   10.983, bar_006, 1);              // 00:10.983 · maat 6 ●●●●
+  hit(t,   10.983, beat_022, 1);             // 00:10.983 · beat 22 (maat 6.1) ●●●●
+  hit(t,   10.983, low_022, 1);              // 00:10.983 · low onset 22 ●●●●
+  hit(t,   10.983, mid_022, 0.98);           // 00:10.983 · mid onset 22 ●●●●
+  hit(t,   11.006, peak_1, 1);               // 00:11.006 · piek 1 (#1, -16.3 dB)
+  hit(t,   11.494, beat_023, 1);             // 00:11.494 · beat 23 (maat 6.2) ●●●●
+  hit(t,   11.494, low_023, 1);              // 00:11.494 · low onset 23 ●●●●
+  hit(t,   11.494, mid_023, 0.99);           // 00:11.494 · mid onset 23 ●●●●
+  hit(t,   11.981, mid_024, 1);              // 00:11.981 · mid onset 24 ●●●●
+  hit(t,   12.005, beat_024, 0.08);          // 00:12.005 · beat 24 (maat 6.3) ○○○○
 
   if (SOUNDLINE.hud) soundlineHud(t);
 }
@@ -121,7 +121,10 @@ function draw() {
 // ──────────────────── Lege functies, in tijdsvolgorde ────────────────────
 // Elke functie krijgt (t, p, e):
 //   t = seconden sinds de start van de cue, p = voortgang 0..1 binnen de cue,
-//   e = { at, dur, name, label, first }  (e.first is true op het eerste frame van de cue).
+//   e = { at, dur, name, label, first, strength }  (e.first is true op het eerste frame van de cue;
+//        e.strength is de onset-sterkte 0..1, 1 voor secties en eigen tikken).
+//   Eigen tikken hebben ook e.key (de toets), e.takes (aantal keer getikt), e.spread (standaardafwijking
+//   van de takes in seconden: hoe zeker de tik is), e.range (bereik in s) en e.manual (met de hand gezet).
 // soundlineLevel(t) geeft het niveau 0..1 op elk moment; soundlineLevel(t, 'low'|'mid'|'high'|'centroid') ook.
 
 // secties (duur-cues: p loopt van 0 naar 1 over de hele sectie) · 1
@@ -241,13 +244,14 @@ function soundlineTime() {
   return _sl.audio.currentTime;
 }
 function soundlineSeek(seconds) { if (_sl.audio && !_sl.noAudio) _sl.audio.currentTime = seconds; else _sl.t0 = millis() - seconds * 1000; }
-function hit(t, at, fn, label) { return during(t, at, SOUNDLINE.hold, fn, label); }
-function during(t, at, dur, fn, label) {
+function hit(t, at, fn, meta) { return during(t, at, SOUNDLINE.hold, fn, null, meta); }
+function during(t, at, dur, fn, label, meta) {
   const name = fn.name || label || String(at);
   if (t < at || t > at + dur) { _sl.active.delete(name); return false; }
   const first = !_sl.active.has(name);
   _sl.active.set(name, t);
-  fn(t - at, dur > 0 ? Math.min(1, (t - at) / dur) : 1, { at, dur, name, label: label || name, first });
+  const info = typeof meta === 'number' ? { strength: meta } : (meta || {});
+  fn(t - at, dur > 0 ? Math.min(1, (t - at) / dur) : 1, Object.assign({ at, dur, name, label: label || name, first, strength: 1 }, info));
   return true;
 }
 function soundlineLevel(t, key = 'level') {
