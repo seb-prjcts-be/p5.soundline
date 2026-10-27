@@ -88,6 +88,16 @@ check('lagere gevoeligheid geeft niet meer onsets', strict.onsets.low.length <= 
   check('secties A B A krijgen de letters A B A', letters === 'ABA', `${letters} — ${sc.sections.map((x) => `${x.letter}:${x.start.toFixed(1)}–${x.end.toFixed(1)} sim ${x.similarity === null ? '-' : x.similarity.toFixed(2)}`).join(', ')}`);
 }
 
+// ── Visuele momenten: hoogstens max, verspreid, met de grote wendingen van het testsignaal.
+{
+  const vm = A.visualMoments(score, { max: 10 });
+  const kinds = vm.map((m) => m.kind);
+  check('visuele momenten: hoogstens 10, chronologisch, sluitend tot het einde', vm.length <= 10 && vm.length >= 4 && vm.every((m, i) => i === 0 || vm[i - 1].t < m.t) && Math.abs(vm[vm.length - 1].t + vm[vm.length - 1].dur - score.duration) < 1e-6, `${vm.length}: ${vm.map((m) => `${m.t.toFixed(1)} ${m.kind}`).join(', ')}`);
+  check('opening, sectiewissel bij 8 s, stilte en drop/terugkeer bij 17 s zitten erbij', kinds[0] === 'opening' && vm.some((m) => m.kind === 'section' && Math.abs(m.t - 8) < 1.5) && vm.some((m) => m.kind === 'silence') && vm.some((m) => ['drop', 'return', 'section'].includes(m.kind) && Math.abs(m.t - 17) < 0.3), vm.map((m) => `${m.t.toFixed(1)} ${m.kind}`).join(', '));
+  const few = A.visualMoments(score, { max: 3 });
+  check('max 3 geeft 3 momenten met de zwaarste gewichten', few.length === 3 && few[0].kind === 'opening', few.map((m) => m.kind).join(', '));
+}
+
 require('fs').writeFileSync(__dirname + '/research/analysis-verification.json', JSON.stringify({
   date: new Date().toISOString(), frames: frames.count, frameRate: frames.frameRate, ms,
   tempo: score.tempo, onsets: { low: rl, high: rh }, beats: rb,

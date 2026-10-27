@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>p5.soundline · Voorbeeld</title>
+  <meta name="description" content="Eén geluidsbestand, hoogstens tien visuele momenten, één p5.js-sketch die meteen iets laat zien. Het eenvoudige voorbeeld van p5.soundline." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Inter:wght@400;500&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css?v=4" />
+  <link rel="stylesheet" href="voorbeeld.css?v=1" />
+</head>
+<body class="simple">
+  <nav id="navbar" aria-label="Projectlinks">
+    <div class="nav-logo"><a href="voorbeeld.html">p5.<span>soundline</span></a></div>
+    <ul class="nav-links">
+      <li><a href="voorbeeld.html" class="active">Voorbeeld</a></li>
+      <li><a href="./">Lab</a></li>
+      <li><a href="README.md" target="_blank" rel="noopener">README</a></li>
+    </ul>
+  </nav>
+
+  <main class="simple-main">
+    <header class="simple-head">
+      <h1>Van geluid naar tien momenten</h1>
+      <p class="lede">Laad een geluidsbestand. Het voorbeeld zoekt de weinige momenten die een beeld moeten dragen: de opening, sectiewissels, drops, stiltes en hun terugkeer, de luidste pieken, een enkel accent. Niet elke noot. Je krijgt één p5.js-sketch met één functie per moment, elk met een kleine voorbeeldtekening die je vervangt.</p>
+    </header>
+
+    <section class="simple-step">
+      <label id="dropzone" class="dropzone" for="file-input">
+        <input id="file-input" type="file" accept="audio/*,.mp3,.wav,.ogg,.m4a,.flac" />
+        <span class="drop-title">Sleep een mp3 hierheen</span>
+        <span class="drop-sub">of klik om te kiezen</span>
+      </label>
+      <div class="simple-row">
+        <button id="load-example" type="button" class="badge-button">Voorbeeld: brunk.mp3</button>
+        <label class="moments-label"><span>Aantal momenten</span><input id="moments" type="range" min="1" max="10" step="1" value="8" /><span class="value" id="moments-value">8</span></label>
+        <span class="hint" id="status">Alles gebeurt lokaal in de browser.</span>
+      </div>
+      <div class="progress" id="progress" hidden><div class="progress-bar" id="progress-bar"></div><span id="progress-text">decoderen…</span></div>
+    </section>
+
+    <section class="simple-step" id="result" hidden>
+      <div class="transport">
+        <button id="play" type="button">Afspelen</button>
+        <span class="time" id="time">00:00.000</span><span class="sep">/</span><span class="time" id="duration">00:00.000</span>
+        <span class="hint" id="meta"></span>
+      </div>
+      <canvas id="line" height="140"></canvas>
+      <ol class="moment-list" id="moment-list"></ol>
+      <audio id="audio" preload="auto"></audio>
+    </section>
+
+    <section class="simple-step simple-two" id="output" hidden>
+      <div class="simple-col">
+        <div class="editor-bar">
+          <span class="hint">sketch.js</span>
+          <div class="editor-actions">
+            <button id="copy" type="button">Kopieer</button>
+            <button id="download" type="button">Download sketch.js + index.html</button>
+          </div>
+        </div>
+        <textarea id="code" class="output" readonly spellcheck="false" wrap="off"></textarea>
+      </div>
+      <div class="simple-col">
+        <div class="editor-bar"><span class="hint">zo ziet het eruit · klik in het beeld om te starten</span><button id="rerun" type="button">Opnieuw</button></div>
+        <iframe id="preview" title="Preview van de sketch"></iframe>
+      </div>
+    </section>
+
+    <footer class="simple-foot">
+      <p>Wil je meer: elke onset, beats en maten, eigen tikken op gehoor, MIDI? Dat zit in het <a href="./">lab</a>. Hoe de momenten gekozen worden staat in <a href="METHODE.md" target="_blank" rel="noopener">METHODE.md</a>.</p>
+    </footer>
+  </main>
+
+  <script src="soundline-analysis.js?v=4"></script>
+  <script src="soundline-codegen.js?v=6"></script>
+  <script src="voorbeeld.js?v=2"></script>
+</body>
+</html>

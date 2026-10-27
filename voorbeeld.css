@@ -1,0 +1,22 @@
+/* Eenvoudig voorbeeld: één kolom, één keuze. */
+.simple-main { max-width: 1180px; margin: 0 auto; padding: 28px 20px 60px; display: flex; flex-direction: column; gap: 26px; }
+.simple-head h1 { font-size: 34px; }
+.simple-head .lede { max-width: 760px; font-size: 15px; line-height: 1.6; color: var(--ink-2); margin: 10px 0 0; }
+.simple-step { display: flex; flex-direction: column; gap: 12px; }
+.simple-row { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
+.moments-label { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--ink-2); }
+.moments-label input[type=range] { width: 160px; }
+.moments-label .value { color: var(--ink); }
+#line { width: 100%; height: 140px; display: block; background: #0a0a0a; border: 1px solid var(--line); border-radius: 2px; cursor: pointer; }
+.moment-list { margin: 0; padding: 0 0 0 22px; display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 4px 24px; font-size: 13px; color: var(--ink-2); }
+.moment-list li { line-height: 1.5; }
+.moment-list li.now { color: var(--ink); }
+.moment-list .t { font-family: var(--mono); color: var(--ink); margin-right: 8px; }
+.moment-list .fn { font-family: var(--mono); font-size: 11.5px; color: var(--ink-3); margin-left: 8px; }
+.simple-two { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 18px; }
+@media (max-width: 900px) { .simple-two { grid-template-columns: 1fr; } }
+.simple-col { display: flex; flex-direction: column; }
+.simple-col .output { min-height: 520px; height: 520px; border-top: none; resize: vertical; }
+#preview { width: 100%; height: 520px; border: 1px solid var(--line); border-top: none; background: #000; }
+.simple-foot p { color: var(--ink-3); font-size: 13px; max-width: 760px; line-height: 1.6; }
+.dropzone { max-width: 420px; }

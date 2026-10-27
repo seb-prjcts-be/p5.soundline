@@ -133,6 +133,24 @@ Twee stijlen. *Tijdlijn*: elke cue een regel in `draw()`, met sectiekoppen; dit 
 
 **MIDI.** Dezelfde selectie als een standaard-MIDI-bestand (formaat 0, 480 ticks per kwart, tempo-meta uit de analyse). Slag-cues op kanaal 10: kick 36, snare 38, hi-hat 42, beat 37, maat 49, piek 57, drop 55; aanslag uit de sterkte. Secties als gehouden noten vanaf C3 per letter, stiltes als C2, eigen lanes vanaf C5, op kanaal 1. Daarmee is de tijdlijn ook in een DAW, in Processing of in een sequencer te gebruiken.
 
+### 10a. Visuele momenten: het eenvoudige voorbeeld
+
+Het lab vindt honderden gebeurtenissen; een beeld kan er een handvol dragen. `visualMoments(score, { max })` kiest er hoogstens tien, met de vraag "waar moet het beeld iets laden" in plaats van "waar klinkt iets". Kandidaten en gewichten:
+
+| kandidaat | gewicht | waarom |
+| --- | --- | --- |
+| opening (t = 0) | 3 | er is altijd een begin |
+| sectiegrens | 1,4 + niveauverschil/10 (max 1) + 0,2 bij nieuwe letter + 0,3 bij lift/breakdown | de grote wendingen |
+| drop | 1,2 + sprong/20 (max 1) | plotse energie |
+| begin van een stilte | 1,0 + duur/4 (max 0,5) | het beeld mag doven |
+| terugkeer na een stilte | 1,1 | het beeld mag terugkomen |
+| piek | 0,9 − 0,08·(rang − 1) | de luidste momenten, in volgorde van luidheid |
+| geïsoleerd accent | 0,6 | een lage slag met sterkte ≥ 0,95 zonder andere sterke lage slag binnen 2 s |
+
+Een sectiegrens die binnen 0,5 s van het begin of einde van een stilte ligt, wordt zelf de stilte of de terugkeer: de soort volgt het geluid, het gewicht blijft dat van de grens. Daarna kiest een greedy ronde de zwaarste kandidaten met een minimale onderlinge afstand van `duur / (max · 4)` seconden (minstens 1 s; drie minuten en tien momenten geeft 4,5 s), zodat de momenten over het nummer verspreid liggen in plaats van samen te klonteren rond één breuk. Elk gekozen moment duurt tot het volgende; het laatste tot het einde. Zo zijn de momenten fasen, geen tikken, en loopt `p` in de sketch van 0 naar 1 tussen twee wendingen.
+
+Op het synthetische testsignaal geeft dat: opening, de sectiewissel bij 8 s, de stilte bij 15,1 s, de terugkeer bij 16,9 s en de piek bij 22 s. Op brunk.mp3 met acht momenten: opening, piek 4, twee drops, pieken 3, 2 en 1, en de stilte van de outro; een homogeen nummer krijgt dus vooral pieken, en het aantal is de enige keuze. De sketch van het voorbeeld (`generateSimple`) zet per soort moment een korte voorbeeldtekening in de functie (een openende cirkel, de letter van de sectie, een rode ring voor een drop, doven bij stilte, terugschietende lijnen, een flits bij een piek, een opspringend vierkant bij een accent) en tekent altijd het niveau als ademende cirkel. Die tekeningen zijn bedoeld om vervangen te worden; `examples: false` geeft dezelfde sketch met lege functies.
+
 ### Tikken op gehoor
 
 De tiklogica staat in `soundline-taps.js`, los van de pagina, met `taps.test.js` als controle. Een toets indrukken tijdens het afspelen legt `audio.currentTime − reactiecorrectie` vast; loslaten na minstens 200 ms maakt er een duur-cue van. Elke toets is een lane met een vrije naam.
@@ -181,6 +199,7 @@ De eerste versie faalde op dit signaal: de gaten tussen de slagen golden als sti
 - De gegenereerde sketch gebruikt het **HTML-audio-element** als klok. Dat is precies genoeg voor beeld op 60 fps (de fout ligt onder één frame), maar niet sample-nauwkeurig; wie geluid wil synthetiseren moet naar de Web Audio-klok.
 - De **duur van een slag-cue** is vast, per type, of tot de volgende in dezelfde lane; een duur per afzonderlijke cue (bijvoorbeeld uit de sterkte) is de volgende stap.
 - **Tikken**: tweede ronde, verslepen, takes afzonderlijk, lane verschuiven en spreiding in `e` zijn er. Wat nog ontbreekt: tikken tussen lanes verplaatsen, een lane dupliceren of samenvoegen, en een tikpartituur importeren uit een eerder `score.json`.
+- **Visuele momenten**: de gewichten zijn met de hand gekozen en op twee signalen bekeken. Een volgende stap is ze te ijken op een handvol echte nummers met een luisteroordeel, en eigen tikken uit het lab als kandidaten met hoog gewicht mee te nemen in het voorbeeld.
 - **Export naar andere vormen**: MIDI is er; een `.pde` voor processing.waves of een p5.waves-compositie waarin elke sectie een eigen golf krijgt, ligt voor de hand.
 
 ## 13. Bronnen

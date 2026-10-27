@@ -656,6 +656,56 @@
     };
   }
 
-  const api = { makeFFT, stft, stftAsync, detect, pickOnsets, estimateTempo, trackBeats, STFT_DEFAULTS, DETECT_DEFAULTS, fmtTime, movingAverage, percentile };
+  // ───────────────────────── 3. Visuele momenten ─────────────────────────
+  /* Kiest uit een score de weinige momenten die een beeld moeten dragen: niet elke noot, maar de
+     opening, sectiewissels, drops, stiltes en hun terugkeer, de luidste pieken en een enkel
+     geïsoleerd accent. Elke kandidaat krijgt een gewicht; de sterkste winnen, met een minimale
+     onderlinge afstand zodat de momenten over het nummer verspreid liggen. Elk moment duurt tot
+     het volgende: een fase, geen tik. */
+  function visualMoments(score, options) {
+    const o = Object.assign({ max: 10, minGapSec: null }, options || {});
+    const max = Math.max(1, Math.min(10, Math.round(o.max)));
+    const dur = score.duration;
+    const minGap = o.minGapSec != null ? o.minGapSec : Math.max(1, dur / (max * 4));   // 3 min, 10 momenten → 4,5 s
+    const cands = [{ t: 0, kind: 'opening', weight: 3, label: 'opening' }];
+    score.sections.forEach((s, i) => {
+      if (i === 0) return;
+      const prev = score.sections[i - 1], delta = s.energyDb - prev.energyDb;
+      const change = delta >= 6 ? 'lift' : delta <= -6 ? 'breakdown' : '';
+      cands.push({ t: s.start, kind: 'section', weight: 1.4 + Math.min(1, Math.abs(delta) / 10) + (s.letter !== prev.letter ? 0.2 : 0) + (change ? 0.3 : 0), label: `sectie ${s.letter}${s.level === 'loud' ? ' · luid' : s.level === 'quiet' ? ' · stil' : ''}${change ? ' · ' + change : ''}`, letter: s.letter, level: s.level });
+    });
+    for (const d of score.drops) cands.push({ t: d.t, kind: 'drop', weight: 1.2 + Math.min(1, d.deltaDb / 20), label: `drop +${d.deltaDb.toFixed(0)} dB` });
+    for (const s of score.silences) {
+      cands.push({ t: s.start, kind: 'silence', weight: 1.0 + Math.min(0.5, (s.end - s.start) / 4), label: `stilte ${(s.end - s.start).toFixed(1)} s` });
+      if (s.end < dur - 1) cands.push({ t: s.end, kind: 'return', weight: 1.1, label: 'terug na de stilte' });
+    }
+    for (const p of score.peaks) cands.push({ t: p.t, kind: 'peak', weight: 0.9 - 0.08 * (p.rank - 1), label: `piek ${p.rank}` });
+    const lows = score.onsets.low || [];
+    for (const on of lows) {
+      if (on.strength < 0.95) continue;
+      const crowded = lows.some((x) => x !== on && Math.abs(x.t - on.t) < 2 && x.strength >= 0.7);
+      if (!crowded) cands.push({ t: on.t, kind: 'accent', weight: 0.6, label: 'accent · lage slag' });
+    }
+    // Een sectiegrens die samenvalt met het begin of einde van een stilte ís die stilte of die terugkeer:
+    // de soort van het moment volgt het geluid, het gewicht blijft dat van de sectiegrens.
+    for (const s of score.silences) {
+      for (const c of cands) {
+        if (c.kind !== 'section') continue;
+        if (Math.abs(c.t - s.start) <= 0.5) { c.kind = 'silence'; c.label = `stilte ${(s.end - s.start).toFixed(1)} s`; }
+        else if (Math.abs(c.t - s.end) <= 0.5) { c.kind = 'return'; c.label = `terug na de stilte · sectie ${c.letter}`; }
+      }
+    }
+    cands.sort((a, b) => b.weight - a.weight || a.t - b.t);
+    const chosen = [];
+    for (const c of cands) {
+      if (chosen.length >= max) break;
+      if (chosen.some((x) => Math.abs(x.t - c.t) < minGap)) continue;
+      chosen.push(c);
+    }
+    chosen.sort((a, b) => a.t - b.t);
+    return chosen.map((c, i) => ({ index: i + 1, t: c.t, dur: (i + 1 < chosen.length ? chosen[i + 1].t : dur) - c.t, kind: c.kind, label: c.label, weight: c.weight, letter: c.letter, level: c.level }));
+  }
+
+  const api = { makeFFT, stft, stftAsync, detect, visualMoments, pickOnsets, estimateTempo, trackBeats, STFT_DEFAULTS, DETECT_DEFAULTS, fmtTime, movingAverage, percentile };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.SoundlineAnalysis = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this);

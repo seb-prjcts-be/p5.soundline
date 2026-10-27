@@ -351,8 +351,154 @@ function soundlineHud(t) {
     return new Uint8Array(bytes);
   }
 
+  /* Eenvoudige sketch: één functie per visueel moment, in volgorde, met een kleine voorbeeldtekening
+     per soort moment die je vervangt. Elk moment loopt tot het volgende (p van 0 naar 1). */
+  const EXAMPLE_BODIES = {
+    opening: `  // voorbeeld: een cirkel die opent. Vervang dit door je eigen beeld.
+  noFill(); stroke(230); strokeWeight(2);
+  circle(width / 2, height / 2, width * (0.05 + 0.6 * Math.min(1, t / 2)));`,
+    section: `  // voorbeeld: een nieuwe sectie krijgt haar letter en een rustige band.
+  noStroke(); fill(255, 30); rect(0, height * 0.4, width * p, height * 0.2);
+  fill(230); textSize(width * 0.2); textAlign(CENTER, CENTER); text(e.letter || '', width / 2, height / 2);`,
+    drop: `  // voorbeeld: een rode ring die naar buiten slaat; op het eerste frame een flits.
+  if (e.first) background(255);
+  noFill(); stroke(255, 0, 0); strokeWeight(width * 0.008 * (1 - Math.min(1, t / 1.5)));
+  circle(width / 2, height / 2, width * (0.05 + 1.2 * Math.min(1, t / 1.5)));`,
+    silence: `  // voorbeeld: het beeld dooft.
+  noStroke(); fill(0, 220 * Math.min(1, t / 0.8)); rect(0, 0, width, height);`,
+    return: `  // voorbeeld: lijnen schieten terug het beeld in.
+  stroke(230); strokeWeight(1);
+  for (let i = 0; i < 24; i++) { const a = i / 24 * TWO_PI, r = width * 0.75 * Math.min(1, t); line(width / 2, height / 2, width / 2 + cos(a) * r, height / 2 + sin(a) * r); }`,
+    peak: `  // voorbeeld: een witte flits die uitdooft.
+  noStroke(); fill(255, 255 * Math.max(0, 1 - t / 0.6)); rect(0, 0, width, height);`,
+    accent: `  // voorbeeld: een rood vierkant dat opspringt en landt.
+  noStroke(); fill(255, 0, 0); const s = width * (0.08 + 0.25 * Math.max(0, 1 - t / 0.4));
+  rect(width / 2 - s / 2, height / 2 - s / 2, s, s);`,
+  };
+  function generateSimple(score, moments, options) {
+    const o = Object.assign({}, DEFAULTS, { examples: true }, options || {});
+    const date = new Date().toISOString().slice(0, 10);
+    const KIND_WORD = { opening: 'opening', section: 'sectie', drop: 'drop', silence: 'stilte', return: 'terug', peak: 'piek', accent: 'accent' };
+    const nameOf = (m) => `m${pad(m.index, 2)}_${KIND_WORD[m.kind] || sanitizeName(m.kind)}${m.kind === 'section' && m.letter ? '_' + m.letter : ''}`;
+    const nameW = Math.max(10, ...moments.map((m) => nameOf(m).length));
+    const level = { hz: score.curves.hz, level: score.curves.level };
+    const lines = [];
+    lines.push('/* ' + '─'.repeat(70));
+    lines.push(`   soundline · ${o.fileName} · ${moments.length} visuele momenten`);
+    lines.push(`   gegenereerd ${date} door p5.soundline (eenvoudig voorbeeld)`);
+    lines.push('');
+    lines.push('   Elk moment is een functie. Ze worden in volgorde vanuit draw() aangeroepen en elk moment');
+    lines.push('   loopt tot het volgende begint: t = seconden sinds het moment, p = voortgang 0..1 tot het');
+    lines.push('   volgende moment, e = { at, dur, kind, label, letter, first, level }. e.level is het geluidsniveau');
+    lines.push('   0..1 van dit frame. De tekeningen in de functies zijn voorbeelden: vervang ze.');
+    lines.push('   Zet het geluidsbestand naast dit bestand; klik op het canvas om te starten.');
+    lines.push('   ' + '─'.repeat(70) + ' */');
+    lines.push('');
+    lines.push('const SOUNDLINE = {');
+    lines.push(`  file: ${JSON.stringify(o.audioSrc || o.fileName)},`);
+    lines.push(`  duration: ${num(score.duration)},`);
+    lines.push(`  hud: ${o.hud ? 'true' : 'false'},`);
+    lines.push(`  moments: ${JSON.stringify(moments.map((m) => [num(m.t), num(m.dur), m.label]))},`);
+    lines.push(`  curves: ${JSON.stringify(level)},`);
+    lines.push('};');
+    lines.push('');
+    lines.push('function setup() {');
+    lines.push(`  createCanvas(${o.canvas[0]}, ${o.canvas[1]});`);
+    lines.push('  soundlineSetup();');
+    lines.push('}');
+    lines.push('');
+    lines.push('function draw() {');
+    lines.push('  background(12);');
+    lines.push('  const t = soundlineTime();        // seconden in het nummer, -1 vóór de start');
+    lines.push('');
+    lines.push('  // altijd: het niveau als ademende cirkel (voorbeeld)');
+    lines.push('  noStroke(); fill(40); circle(width / 2, height / 2, width * (0.12 + 0.6 * soundlineLevel(t)));');
+    lines.push('');
+    lines.push('  // de momenten, in volgorde; elk loopt tot het volgende');
+    for (const m of moments) lines.push(`  ${`moment(t, ${padNum(m.t, 8)}, ${padNum(m.dur, 8)}, ${nameOf(m)});`.padEnd(nameW + 30)}  // ${fmt(m.t)} · ${m.label}`);
+    lines.push('');
+    lines.push('  if (SOUNDLINE.hud) soundlineHud(t);');
+    lines.push('}');
+    lines.push('');
+    lines.push('// ' + '─'.repeat(20) + ' De momenten ' + '─'.repeat(20));
+    for (const m of moments) {
+      lines.push(`// ${fmt(m.t)} → ${fmt(m.t + m.dur)} · ${m.label}`);
+      lines.push(`function ${nameOf(m)}(t, p, e) {`);
+      if (o.examples) lines.push(EXAMPLE_BODIES[m.kind] || EXAMPLE_BODIES.accent);
+      lines.push('}');
+      lines.push('');
+    }
+    lines.push(`// ${'─'.repeat(20)} soundline runtime (hoeft niet aangepast) ${'─'.repeat(20)}
+const _sl = { audio: null, started: false, noAudio: false, t0: 0, active: new Map(), kinds: ${JSON.stringify(Object.fromEntries(moments.map((m) => [nameOf(m), { kind: m.kind, letter: m.letter || null }])))} };
+function soundlineSetup() {
+  _sl.audio = new Audio(SOUNDLINE.file);
+  _sl.audio.preload = 'auto';
+  _sl.audio.addEventListener('error', () => { _sl.noAudio = true; });
+  const canvas = document.querySelector('canvas');
+  if (canvas) canvas.addEventListener('pointerdown', soundlineToggle);
+  window.addEventListener('keydown', (ev) => { if (ev.code === 'Space') { ev.preventDefault(); soundlineToggle(); } });
+}
+function soundlineToggle() {
+  if (!_sl.started) {
+    _sl.started = true; _sl.t0 = millis();
+    if (!_sl.noAudio) _sl.audio.play().catch(() => { _sl.noAudio = true; _sl.t0 = millis(); });
+  } else if (_sl.noAudio) { _sl.paused = !_sl.paused; if (_sl.paused) _sl.pausedAt = millis(); else _sl.t0 += millis() - _sl.pausedAt; }
+  else if (_sl.audio.paused) _sl.audio.play(); else _sl.audio.pause();
+}
+function soundlineTime() {
+  if (!_sl.started) return -1;
+  if (_sl.noAudio) return ((_sl.paused ? _sl.pausedAt : millis()) - _sl.t0) / 1000;
+  return _sl.audio.currentTime;
+}
+function moment(t, at, dur, fn) {
+  const name = fn.name;
+  if (t < at || t >= at + dur) { _sl.active.delete(name); return false; }
+  const first = !_sl.active.has(name);
+  _sl.active.set(name, t);
+  const k = _sl.kinds[name] || {};
+  push();
+  fn(t - at, dur > 0 ? Math.min(1, (t - at) / dur) : 1, { at, dur, name, kind: k.kind, letter: k.letter, label: name, first, level: soundlineLevel(t) });
+  pop();
+  return true;
+}
+function soundlineLevel(t) {
+  const c = SOUNDLINE.curves; if (!c || t < 0) return 0;
+  const x = t * c.hz, i = Math.floor(x), a = c.level[Math.min(i, c.level.length - 1)], b = c.level[Math.min(i + 1, c.level.length - 1)];
+  return a + (b - a) * (x - i);
+}
+function soundlineHud(t) {
+  push(); resetMatrix(); noStroke(); textFont('monospace'); textSize(11); textAlign(LEFT, CENTER);
+  const h = 36, y = height - h, w = width - 24, x0 = 12;
+  fill(0, 180); rect(0, y, width, h);
+  for (const m of SOUNDLINE.moments) { const a = x0 + w * m[0] / SOUNDLINE.duration; fill(t >= m[0] && t < m[0] + m[1] ? 255 : 110); rect(a, y + 8, 2, 8); }
+  fill(255, 0, 0); rect(x0 + w * Math.max(0, Math.min(1, t / SOUNDLINE.duration)) - 1, y + 6, 2, 12);
+  const mm = Math.floor(Math.max(0, t) / 60), ss = (Math.max(0, t) % 60).toFixed(1).padStart(4, '0');
+  const cur = SOUNDLINE.moments.filter((m) => t >= m[0] && t < m[0] + m[1]).map((m) => m[2]).join('  ');
+  fill(230); text(t < 0 ? 'klik op het canvas om te starten' : mm + ':' + ss + '  ' + cur, x0, y + 26);
+  pop();
+}`);
+    const sketch = lines.join('\n') + '\n';
+    const html = `<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>soundline · ${escapeHtml(o.fileName)}</title>
+<style>html,body{margin:0;background:#000;color:#ddd;font:12px/1.4 monospace}main{display:flex;justify-content:center;padding:16px}canvas{display:block}p{max-width:800px;margin:0 auto;padding:0 16px 16px;color:#888}</style>
+<script src="${o.p5Url}"></script>
+</head>
+<body>
+<main></main>
+<p>Zet <b>${escapeHtml(o.fileName)}</b> naast dit bestand en open de map via een lokale server. Klik op het canvas om te starten.</p>
+<script src="sketch.js"></script>
+</body>
+</html>
+`;
+    return { sketch, html, moments, names: moments.map(nameOf) };
+  }
+
   function escapeHtml(s) { return String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
 
-  const api = { generate, selectCues, cueName, sanitizeName, buildMidi, isTap, DEFAULTS, TYPES, NAMES, fmt };
+  const api = { generate, generateSimple, selectCues, cueName, sanitizeName, buildMidi, isTap, DEFAULTS, TYPES, NAMES, EXAMPLE_BODIES, fmt };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.SoundlineCodegen = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this);

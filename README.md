@@ -1,6 +1,34 @@
-# p5.soundline Lab
+# p5.soundline
 
-Laad een geluidsbestand, laat het lab de muziek ontleden en krijg een p5.js-sketch terug met **lege functies op de juiste tijdstippen in `draw()`**. Jij vult de functies; het lab levert de tijdlijn.
+Laad een geluidsbestand en krijg een p5.js-sketch terug met **functies op de juiste tijdstippen in `draw()`**. Jij vult de functies; soundline levert de tijdlijn.
+
+## Begin hier: het eenvoudige voorbeeld
+
+Open [voorbeeld.html](http://localhost/p5.soundline/voorbeeld.html). Eén bestand, één keuze (het aantal momenten, hoogstens tien), één sketch. Het voorbeeld zoekt niet elke noot maar de weinige momenten die een beeld moeten dragen: de opening, sectiewissels, drops, stiltes en hun terugkeer, de luidste pieken en een enkel geïsoleerd accent. Elk moment wordt een functie die loopt tot het volgende moment begint, met een kleine voorbeeldtekening erin die je vervangt. De preview ernaast laat meteen zien wat er gebeurt.
+
+```js
+function draw() {
+  background(12);
+  const t = soundlineTime();
+  noStroke(); fill(40); circle(width / 2, height / 2, 100 + 500 * soundlineLevel(t));
+  moment(t,        0,    7.392, m01_opening);   // 00:00.000 · opening
+  moment(t,    7.392,   21.141, m02_piek);      // 00:07.392 · piek 4
+  moment(t,   28.533,   18.966, m03_drop);      // 00:28.533 · drop +10 dB
+  …
+}
+function m03_drop(t, p, e) {
+  // voorbeeld: een rode ring die naar buiten slaat; op het eerste frame een flits.
+  if (e.first) background(255);
+  noFill(); stroke(255, 0, 0); strokeWeight(6 * (1 - Math.min(1, t / 1.5)));
+  circle(width / 2, height / 2, 40 + 900 * Math.min(1, t / 1.5));
+}
+```
+
+`t` is de tijd sinds het moment, `p` de voortgang tot het volgende, `e.kind` de soort (`opening`, `section`, `drop`, `silence`, `return`, `peak`, `accent`), `e.letter` de sectieletter, `e.first` het eerste frame, `e.level` het geluidsniveau 0..1. Hoe de momenten gekozen worden staat in [METHODE.md](METHODE.md), paragraaf 10a.
+
+## Het lab
+
+Wie meer wil, opent het lab: elke onset in drie banden, beats en maten, secties, eigen tikken op gehoor, MIDI, en alle schuiven.
 
 Open [http://localhost/p5.soundline/](http://localhost/p5.soundline/) op de lokale server. Er is geen buildstap en geen netwerk nodig behalve de Google-fonts; het rekenwerk gebeurt volledig in de browser en er wordt niets verstuurd. Een `brunk.mp3` naast `index.html` dient als voorbeeld (knop **Voorbeeld: brunk.mp3**); het bestand staat niet in de repository.
 
@@ -50,6 +78,7 @@ De sketch is geschreven voor p5.js 2.x in globale modus en gebruikt geen p5.soun
 
 | Bestand | Rol |
 | --- | --- |
+| `voorbeeld.html`, `voorbeeld.css`, `voorbeeld.js` | het eenvoudige voorbeeld: één keuze, hoogstens tien momenten, sketch met voorbeeldtekeningen |
 | `index.html`, `style.css`, `app.js` | het lab: laden, tijdlijn, parameters, uitvoer en preview |
 | `soundline-analysis.js` | rekenkern: FFT, STFT, features, detectoren; ook in Node te laden |
 | `soundline-taps.js` | het tiksysteem: lanes, takes, spreiding, verplaatsen, omzetting naar cues; ook in Node te laden |

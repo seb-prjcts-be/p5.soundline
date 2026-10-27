@@ -112,6 +112,28 @@ for (const style of ['timeline', 'compact']) {
   check('bij "tot de volgende" is de duur per type het maximum', capped.cues.filter((c) => c.type === 'low').every((c) => c.holdDur <= 0.3 + 1e-9));
 }
 
+// ── Eenvoudige sketch: geldig, één functie per moment, momenten vuren in volgorde met e.kind en e.level.
+{
+  const moments = A.visualMoments(score, { max: 6 });
+  const simple = G.generateSimple(score, moments, { fileName: 'test.mp3' });
+  let ok = true, err = ''; try { new vm.Script(simple.sketch); } catch (e) { ok = false; err = e.message; }
+  check('eenvoudige sketch is geldige JavaScript', ok, err || `${simple.sketch.split('\n').length} regels, ${moments.length} momenten`);
+  check('eenvoudige sketch: unieke functienamen, één per moment', new Set(simple.names).size === moments.length && simple.names.every((n) => new RegExp(`function ${n}\\(t, p, e\\) \\{`).test(simple.sketch)), simple.names.join(', '));
+  const calls = [];
+  const sb = { document: { querySelector: () => null }, window: { addEventListener() {} }, console, Audio: function () { return { addEventListener() {}, play: () => Promise.resolve(), paused: false, currentTime: 0 }; },
+    createCanvas() {}, background() {}, push() {}, pop() {}, resetMatrix() {}, noStroke() {}, noFill() {}, stroke() {}, strokeWeight() {}, textFont() {}, textSize() {}, textAlign() {}, fill() {}, rect() {}, circle() {}, line() {}, text() {}, cos: Math.cos, sin: Math.sin, TWO_PI: Math.PI * 2, CENTER: 1, LEFT: 0,
+    millis: () => 0, width: 800, height: 800, Math, Number, String, Map, JSON, Object, __calls: calls };
+  vm.createContext(sb);
+  vm.runInContext(simple.sketch + '\nsetup();', sb);
+  vm.runInContext(`${simple.names[1]} = function (t, p, e) { __calls.push([e.kind, e.first, e.level, p]); };`, sb);
+  const m1 = moments[1];
+  vm.runInContext(`_sl.started = true; _sl.audio.currentTime = ${m1.t - 0.01}; draw(); _sl.audio.currentTime = ${m1.t + 0.05}; draw(); _sl.audio.currentTime = ${m1.t + m1.dur / 2}; draw(); _sl.audio.currentTime = ${m1.t + m1.dur + 0.05}; draw();`, sb);
+  check('moment vuurt alleen binnen zijn fase, met e.kind, e.first en e.level', calls.length === 2 && calls[0][0] === m1.kind && calls[0][1] === true && calls[1][1] === false && calls[1][2] >= 0 && calls[1][2] <= 1 && Math.abs(calls[1][3] - 0.5) < 0.05, JSON.stringify(calls));
+  const bare = G.generateSimple(score, moments, { examples: false });
+  check('zonder voorbeelden zijn de functies leeg', new RegExp(`function ${simple.names[0]}\\(t, p, e\\) \\{\\n\\}`).test(bare.sketch));
+  require('fs').writeFileSync(__dirname + '/research/example-output.simple.sketch.js', simple.sketch);
+}
+
 const parsed = JSON.parse(G.generate(score, {}).json);
 check('score.json is geldige JSON met secties en curves', Array.isArray(parsed.sections) && parsed.curves.level.length > 0);
 console.log(fails ? `\n${fails} controle(s) mislukt` : '\nalle controles geslaagd');
