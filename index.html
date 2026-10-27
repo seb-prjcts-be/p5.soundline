@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Inter:wght@400;500&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="style.css?v=2" />
+  <link rel="stylesheet" href="style.css?v=3" />
 </head>
 <body>
   <nav id="navbar" aria-label="Projectlinks">
@@ -86,12 +86,16 @@
 
       <section class="control-group tap-group">
         <h2>Tikken op gehoor</h2>
-        <p class="hint tap-help">Speel af en druk een <b>letter of cijfer</b>: elke toets is een eigen lane. Kort tikken = slag-cue, vasthouden = duur-cue. <b>Backspace</b> haalt de laatste tik weg. Eigen lanes gaan als gewone cues mee in de sketch, rood in de tijdlijn.</p>
+        <p class="hint tap-help">Speel af en druk een <b>letter of cijfer</b>: elke toets is een eigen lane. Kort tikken = slag-cue, vasthouden = duur-cue. <b>Backspace</b> haalt de laatste tik weg. In de tijdlijn: <b>klik</b> selecteert een tik, <b>slepen</b> verplaatst hem, de rechterrand van een duur-cue rekt. Eigen lanes gaan als gewone cues mee in de sketch, rood in de tijdlijn.</p>
         <label><span class="label-text">Reactiecorrectie (ms)</span><input id="tap-latency" type="range" min="0" max="300" step="5" value="0" /><span class="value" data-for="tap-latency">0</span></label>
         <div class="scene-actions"><button id="tap-calibrate" type="button" class="badge-button" title="Acht klikken op 120 BPM; tik mee met een letter. De mediaan wordt de correctie.">Kalibreer met metronoom</button><span class="hint" id="tap-calib-result"></span></div>
+        <label><span class="label-text">Ronde</span><select id="tap-round"><option value="new" selected>eerste ronde: elke tik is nieuw</option><option value="merge">volgende ronde: samenvoegen met een bestaande tik</option></select></label>
+        <label><span class="label-text">Samenvoegvenster (ms)</span><input id="tap-merge" type="range" min="50" max="400" step="10" value="150" /><span class="value" data-for="tap-merge">150</span></label>
+        <div class="hint" id="tap-round-result">Tik dezelfde passage nog eens in de volgende ronde: elke tik krijgt meerdere takes, het gemiddelde telt en de spreiding laat zien hoe zeker je was.</div>
         <label><span class="label-text">Snap naar</span><select id="tap-snap"><option value="none" selected>niets (zoals getikt)</option><option value="onset">dichtstbijzijnde onset</option><option value="beat">dichtstbijzijnde beat</option></select></label>
         <label><span class="label-text">Snap-tolerantie (ms)</span><input id="tap-snap-tol" type="range" min="10" max="200" step="5" value="60" /><span class="value" data-for="tap-snap-tol">60</span></label>
         <div id="tap-lanes" class="tap-lanes"></div>
+        <div class="hint tap-selected" id="tap-selected" hidden></div>
         <div class="scene-actions"><button id="tap-undo" type="button" class="badge-button">Laatste tik weg</button><button id="tap-clear" type="button" class="badge-button">Alles wissen</button></div>
       </section>
 
@@ -184,8 +188,9 @@
     </div>
   </div>
 
-  <script src="soundline-analysis.js?v=2"></script>
-  <script src="soundline-codegen.js?v=2"></script>
-  <script src="app.js?v=2"></script>
+  <script src="soundline-analysis.js?v=3"></script>
+  <script src="soundline-taps.js?v=1"></script>
+  <script src="soundline-codegen.js?v=3"></script>
+  <script src="app.js?v=5"></script>
 </body>
 </html>

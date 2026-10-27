@@ -33,6 +33,7 @@
     holdSec: 0.25,
     holdMode: 'fixed',           // 'fixed' = holdSec; 'untilNext' = tot de volgende cue in dezelfde lane (max holdMax)
     holdMax: 4,
+    holdPerType: {},             // { low: 0.5, 'tap:kick': 1 }: in 'fixed' de duur van dat type, in 'untilNext' het maximum
     names: 'en',
     hud: true,
     embedCurves: 'level',        // 'none' | 'level' | 'all'
@@ -82,11 +83,12 @@
     }
     out.sort((a, b) => a.t - b.t || typeOrder(a.type) - typeOrder(b.type));
     const nextOfType = {};
+    const holdFor = (type) => { const v = o.holdPerType && o.holdPerType[type]; return v > 0 ? v : null; };
     for (let i = out.length - 1; i >= 0; i--) {
       const e = out[i];
       if (e.dur > 0) e.holdDur = e.dur;
-      else if (o.holdMode === 'untilNext') { const next = nextOfType[e.type]; e.holdDur = next ? Math.min(o.holdMax, Math.max(0.05, next.t - e.t)) : o.holdSec; }
-      else e.holdDur = o.holdSec;
+      else if (o.holdMode === 'untilNext') { const next = nextOfType[e.type]; const cap = holdFor(e.type) ?? o.holdMax; e.holdDur = next ? Math.min(cap, Math.max(0.05, next.t - e.t)) : Math.min(cap, holdFor(e.type) ?? o.holdSec); }
+      else e.holdDur = holdFor(e.type) ?? o.holdSec;
       nextOfType[e.type] = e;
     }
     return out;
@@ -152,7 +154,7 @@
       '};',
     ].join('\n');
 
-    const explicitDur = (e) => e.dur > 0 || o.holdMode === 'untilNext';
+    const explicitDur = (e) => e.dur > 0 || o.holdMode === 'untilNext' || Math.abs(e.holdDur - o.holdSec) > 1e-9;
     const callFor = (e) => explicitDur(e)
       ? `during(t, ${padNum(e.t, 8)}, ${padNum(e.holdDur, 8)}, ${nameOf(e)});`
       : `hit(t, ${padNum(e.t, 8)}, ${nameOf(e)});`;
@@ -290,7 +292,7 @@ function soundlineHud(t) {
       peaks: score.peaks.map((p) => ({ index: p.index, rank: p.rank, t: round(p.t), db: round(p.db) })),
       silences: score.silences.map((s) => ({ start: round(s.start), end: round(s.end) })),
       drops: score.drops.map((d) => ({ index: d.index, t: round(d.t), deltaDb: round(d.deltaDb) })),
-      taps: taps.map((e) => ({ lane: e.lane, key: e.key || null, index: e.index, t: round(e.t), dur: round(e.dur || 0), raw: e.raw == null ? null : round(e.raw) })),
+      taps: taps.map((e) => ({ lane: e.lane, key: e.key || null, index: e.index, t: round(e.t), dur: round(e.dur || 0), raw: e.raw == null ? null : round(e.raw), takes: e.takes || 1, spreadMs: e.spreadMs == null ? 0 : Math.round(e.spreadMs), manual: !!e.manual })),
       selected: cues.map((c) => ({ fn: cueName(c, o), type: c.type, t: round(c.t), dur: round(c.holdDur) })),
       curves: score.curves,
       params: score.params,

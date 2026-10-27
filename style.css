@@ -71,10 +71,11 @@ label.inline { display: flex; align-items: center; gap: 8px; }
 .stats b { color: var(--ink); font-weight: 500; }
 
 /* Rechts: generator */
-.include-grid { display: grid; grid-template-columns: auto 1fr auto auto; gap: 4px 10px; align-items: center; margin-top: 10px; font-size: 12px; }
+.include-grid { display: grid; grid-template-columns: auto 1fr auto auto auto; gap: 4px 8px; align-items: center; margin-top: 10px; font-size: 12px; }
 .include-grid .head { color: var(--ink-3); font-size: 10.5px; text-transform: uppercase; letter-spacing: .08em; }
 .include-grid .count { font-family: var(--mono); color: var(--ink-2); text-align: right; }
-.include-grid input[type=number] { width: 58px; padding: 2px 4px; }
+.include-grid input[type=number] { width: 56px; padding: 2px 4px; }
+.include-grid input[type=number]::placeholder { color: var(--ink-3); }
 .include-grid .lane-name { display: flex; align-items: center; gap: 6px; }
 .include-grid .lane-name i { display: inline-block; width: 8px; height: 8px; background: var(--ink-2); }
 .editor-section { display: flex; flex-direction: column; flex: 1; min-height: 420px; border-top: 1px solid var(--line); padding-top: 12px; }
@@ -101,6 +102,7 @@ label.inline { display: flex; align-items: center; gap: 8px; }
 .tap-lane button { padding: 2px 8px; font-size: 11.5px; }
 .include-grid .lane-name.own i { background: var(--red); }
 #tap-calib-result { margin: 0; align-self: center; }
+.tap-selected { border-left: 2px solid var(--red); padding-left: 8px; font-family: var(--sans); color: var(--ink-2); line-height: 1.5; }
 
 /* Modal */
 .modal { position: fixed; inset: 0; z-index: 20; display: flex; align-items: center; justify-content: center; }

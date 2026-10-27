@@ -87,6 +87,17 @@ for (const style of ['timeline', 'compact']) {
   check('MIDI: geldige kop, tracklengte klopt, note-ons = cues', txt(0, 4) === 'MThd' && txt(14, 18) === 'MTrk' && 22 + trackLen === m.length && noteOns === withTaps.summary.cues, `${m.length} bytes, ${noteOns} note-ons, ${withTaps.summary.cues} cues`);
 }
 
+// ── Duur per cue-type: vast per type, en als maximum bij 'tot de volgende'.
+{
+  const all = { section: true, bar: true, beat: true, low: true, mid: true, high: true, peak: true, silence: true, drop: true };
+  const per = G.generate(score, { include: all, holdSec: 0.25, holdPerType: { low: 0.6, beat: 0.1 } });
+  const lows = per.cues.filter((c) => c.type === 'low'), beats = per.cues.filter((c) => c.type === 'beat'), highs = per.cues.filter((c) => c.type === 'high');
+  check('duur per type: laag 0,6 s, beat 0,1 s, hoog valt terug op 0,25 s', lows.every((c) => c.holdDur === 0.6) && beats.every((c) => c.holdDur === 0.1) && highs.every((c) => c.holdDur === 0.25));
+  check('afwijkende duur staat expliciet als during() in draw()', /during\(t,\s*[\d.]+,\s*0\.6,\s*low_001\)/.test(per.sketch) && /hit\(t,\s*[\d.]+,\s*mid_001\)/.test(per.sketch));
+  const capped = G.generate(score, { include: all, holdMode: 'untilNext', holdPerType: { low: 0.3 } });
+  check('bij "tot de volgende" is de duur per type het maximum', capped.cues.filter((c) => c.type === 'low').every((c) => c.holdDur <= 0.3 + 1e-9));
+}
+
 const parsed = JSON.parse(G.generate(score, {}).json);
 check('score.json is geldige JSON met secties en curves', Array.isArray(parsed.sections) && parsed.curves.level.length > 0);
 console.log(fails ? `\n${fails} controle(s) mislukt` : '\nalle controles geslaagd');

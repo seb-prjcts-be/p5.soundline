@@ -1,8 +1,9 @@
 /* app.js — p5.soundline Lab: bestand laden, decoderen, analyseren, tijdlijn tekenen, tikken op gehoor,
-   sketch genereren. Rekenwerk zit in soundline-analysis.js; tekstgeneratie in soundline-codegen.js. */
+   sketch genereren. Rekenwerk zit in soundline-analysis.js, tiklogica in soundline-taps.js,
+   tekstgeneratie in soundline-codegen.js. */
 (() => {
   'use strict';
-  const A = window.SoundlineAnalysis, G = window.SoundlineCodegen;
+  const A = window.SoundlineAnalysis, G = window.SoundlineCodegen, T = window.SoundlineTaps;
   const $ = (id) => document.getElementById(id);
   const fmt = A.fmtTime;
 
@@ -11,20 +12,23 @@
     { type: 'low', label: 'laag' }, { type: 'mid', label: 'midden' }, { type: 'high', label: 'hoog' },
     { type: 'peak', label: 'pieken' }, { type: 'silence', label: 'stiltes' }, { type: 'drop', label: 'drops' },
   ];
+  const INSTANT_TYPES = new Set(['bar', 'beat', 'low', 'mid', 'high', 'peak', 'drop']);
   const ROWS = { ruler: 20, wave: 110, spec: 150, curves: 70, lane: 18 };
   const LANE_TOP = ROWS.ruler + ROWS.wave + ROWS.spec + ROWS.curves;
   const SETTINGS_KEY = 'soundline-lab-settings-v1';
   const SETTING_IDS = ['fft-size', 'hop', 'sens-low', 'sens-mid', 'sens-high', 'onset-gap', 'bpm-min', 'bpm-max', 'bpm-prior', 'tightness', 'tempo-octave', 'meter',
     'section-kernel', 'section-min', 'section-sens', 'peak-count', 'silence-drop', 'drop-db',
-    'gen-style', 'gen-names', 'gen-hold', 'gen-hold-mode', 'gen-min-strength', 'gen-curves', 'gen-hud', 'tap-latency', 'tap-snap', 'tap-snap-tol', 'follow'];
+    'gen-style', 'gen-names', 'gen-hold', 'gen-hold-mode', 'gen-min-strength', 'gen-curves', 'gen-hud', 'tap-latency', 'tap-snap', 'tap-snap-tol', 'tap-round', 'tap-merge', 'follow'];
 
   const state = {
     fileName: '', samples: null, sampleRate: 44100, duration: 0, audioUrl: null,
-    frames: null, score: null, gen: null, analysisMs: 0,
+    frames: null, score: null, gen: null, genKeys: new Set(), analysisMs: 0,
     view: { start: 0, end: 1 }, tab: 'sketch', wavePeaks: null, specImage: null,
-    include: Object.assign({}, G.DEFAULTS.include), maxPerType: Object.assign({}, G.DEFAULTS.maxPerType),
+    include: Object.assign({}, G.DEFAULTS.include), maxPerType: Object.assign({}, G.DEFAULTS.maxPerType), holdPerType: {},
     drag: null, raf: 0,
-    taps: { lanes: {} }, tapEvents: [], tapDown: {}, undo: [], calib: null,
+    taps: T.normalize({ lanes: {} }), tapEvents: [], tapDown: {}, undo: [], calib: null,
+    selected: null,      // { key, tap } geselecteerde tik
+    tapDrag: null,       // { key, tap, mode: 'move' | 'resize', x0, t0, dur0, moved }
   };
 
   const audio = $('audio');
@@ -36,7 +40,7 @@
     try {
       const values = {};
       for (const id of SETTING_IDS) { const el = $(id); if (el) values[id] = el.type === 'checkbox' ? el.checked : el.value; }
-      localStorage.setItem(SETTINGS_KEY, JSON.stringify({ values, include: state.include, maxPerType: state.maxPerType }));
+      localStorage.setItem(SETTINGS_KEY, JSON.stringify({ values, include: state.include, maxPerType: state.maxPerType, holdPerType: state.holdPerType }));
     } catch (e) { /* privévenster of geblokkeerde opslag: dan onthouden we niets */ }
   }
   function loadSettings() {
@@ -44,12 +48,15 @@
       const raw = localStorage.getItem(SETTINGS_KEY); if (!raw) return;
       const saved = JSON.parse(raw);
       for (const id in saved.values || {}) { const el = $(id); if (!el) continue; if (el.type === 'checkbox') el.checked = !!saved.values[id]; else el.value = saved.values[id]; }
-      Object.assign(state.include, saved.include || {}); Object.assign(state.maxPerType, saved.maxPerType || {});
+      Object.assign(state.include, saved.include || {}); Object.assign(state.maxPerType, saved.maxPerType || {}); Object.assign(state.holdPerType, saved.holdPerType || {});
     } catch (e) { /* onleesbaar: standaardwaarden */ }
   }
   function tapsKey() { return `soundline-taps:${state.fileName}:${state.duration.toFixed(2)}`; }
   function saveTaps() { try { localStorage.setItem(tapsKey(), JSON.stringify(state.taps)); } catch (e) { /* zie boven */ } }
-  function loadTaps() { try { const raw = localStorage.getItem(tapsKey()); state.taps = raw ? JSON.parse(raw) : { lanes: {} }; } catch (e) { state.taps = { lanes: {} }; } state.undo = []; }
+  function loadTaps() {
+    try { const raw = localStorage.getItem(tapsKey()); state.taps = T.normalize(raw ? JSON.parse(raw) : { lanes: {} }); } catch (e) { state.taps = T.normalize({ lanes: {} }); }
+    state.undo = []; state.selected = null;
+  }
 
   // ───────────────────────── Bestand laden en decoderen ─────────────────────────
   async function loadFile(file) {
@@ -145,36 +152,16 @@
   }
 
   // ───────────────────────── Tikken op gehoor ─────────────────────────
-  const tapLaneList = () => Object.values(state.taps.lanes).sort((a, b) => a.key.localeCompare(b.key));
-  function tapLaneType(lane) { return 'tap:' + (lane.label || lane.key); }
-  /* Zet de ruwe tikken om in cues: reactiecorrectie is al toegepast bij het tikken; snappen gebeurt hier. */
+  const tapLaneList = () => T.lanes(state.taps);
+  /* Ruwe tikken → cues. Reactiecorrectie zit al in de tik; snappen gebeurt hier (niet voor handmatige). */
   function refreshTaps(redraw = true) {
-    const snap = $('tap-snap').value, tol = +$('tap-snap-tol').value / 1000;
-    let targets = [];
-    if (state.score && snap === 'onset') targets = Object.values(state.score.onsets).flat().map((o) => o.t).sort((a, b) => a - b);
-    if (state.score && snap === 'beat') targets = state.score.beats.map((b) => b.t);
-    const snapTo = (t) => {
-      if (!targets.length) return t;
-      let best = t, d = tol + 1;
-      for (const x of targets) { const dd = Math.abs(x - t); if (dd < d) { d = dd; best = x; } if (x > t + tol) break; }
-      return d <= tol ? best : t;
-    };
-    const events = [];
-    for (const lane of tapLaneList()) {
-      const sorted = lane.taps.slice().sort((a, b) => a.t - b.t);
-      sorted.forEach((tap, i) => {
-        const t = Math.max(0, Math.min(state.duration || Infinity, snapTo(tap.t)));
-        events.push({ type: tapLaneType(lane), lane: lane.label || lane.key, key: lane.key, t, dur: tap.dur || 0, index: i + 1, strength: 1, raw: tap.raw, label: `tik ${lane.key} · ${lane.label || lane.key} ${i + 1}${tap.dur ? ' (duur)' : ''}` });
-      });
-    }
-    events.sort((a, b) => a.t - b.t);
-    state.tapEvents = events;
+    const snap = $('tap-snap').value, tolSec = +$('tap-snap-tol').value / 1000;
+    let snapTargets = [];
+    if (state.score && snap === 'onset') snapTargets = Object.values(state.score.onsets).flat().map((o) => o.t);
+    if (state.score && snap === 'beat') snapTargets = state.score.beats.map((b) => b.t);
+    state.tapEvents = T.toEvents(state.taps, { snapTargets, tolSec, duration: state.duration || Infinity });
     renderTapLanes();
     if (redraw) { regenerate(); draw(); }
-  }
-  function laneFor(key) {
-    if (!state.taps.lanes[key]) state.taps.lanes[key] = { key, label: key, taps: [] };
-    return state.taps.lanes[key];
   }
   function tapDown(key) {
     if (!state.samples || state.tapDown[key] !== undefined) return;
@@ -188,17 +175,32 @@
     const latency = +$('tap-latency').value / 1000;
     const held = (performance.now() - d.wall) / 1000;
     const end = Math.max(d.start, audio.currentTime - latency);
-    const dur = held >= 0.2 && !audio.paused ? Math.max(0.2, end - d.start) : 0;
-    const lane = laneFor(key);
-    lane.taps.push({ t: d.start, dur, raw: d.start + latency });
-    state.undo.push({ key, tap: lane.taps[lane.taps.length - 1] });
+    const dur = held >= T.DEFAULTS.holdThresholdSec && !audio.paused ? Math.max(0.2, end - d.start) : 0;
+    const res = T.addTap(state.taps, key, { t: d.start, dur, raw: d.start + latency }, { mode: $('tap-round').value, mergeWindowMs: +$('tap-merge').value });
+    state.undo.push({ key, tap: res.tap, take: res.take });
+    if (res.merged) flashRound(res);
     saveTaps(); refreshTaps();
+  }
+  function flashRound(res) {
+    const sp = T.spread(res.tap);
+    $('tap-round-result').textContent = `samengevoegd met tik ${res.lane.label} @ ${fmt(res.tap.t)} · ${sp.n} takes · ±${sp.sdMs.toFixed(0)} ms`;
   }
   function undoTap() {
     const last = state.undo.pop(); if (!last) return;
-    const lane = state.taps.lanes[last.key]; if (!lane) return;
-    const i = lane.taps.indexOf(last.tap); if (i >= 0) lane.taps.splice(i, 1);
-    if (!lane.taps.length) delete state.taps.lanes[last.key];
+    T.removeTake(state.taps, last.key, last.tap, last.take);
+    if (state.selected && state.selected.tap === last.tap && !state.taps.lanes[last.key]?.taps.includes(last.tap)) state.selected = null;
+    saveTaps(); refreshTaps();
+  }
+  function deleteSelected() {
+    if (!state.selected) return;
+    T.removeTap(state.taps, state.selected.key, state.selected.tap);
+    state.undo = state.undo.filter((u) => u.tap !== state.selected.tap);
+    state.selected = null;
+    saveTaps(); refreshTaps();
+  }
+  function nudgeSelected(dt) {
+    if (!state.selected) return;
+    T.moveTap(state.selected.tap, state.selected.tap.t + dt, state.duration);
     saveTaps(); refreshTaps();
   }
   function renderTapLanes() {
@@ -206,16 +208,25 @@
     const lanes = tapLaneList();
     host.innerHTML = lanes.length ? '' : '<div class="hint">Nog geen tikken. Speel af en druk een letter of cijfer.</div>';
     for (const lane of lanes) {
+      const st = T.laneStats(lane);
       const row = document.createElement('div'); row.className = 'tap-lane';
       const key = document.createElement('span'); key.className = 'key'; key.textContent = lane.key;
       const label = document.createElement('input'); label.type = 'text'; label.value = lane.label; label.title = 'Naam van deze lane; wordt de functienaam in de sketch'; label.maxLength = 24;
-      label.addEventListener('change', () => { const old = tapLaneType(lane); lane.label = label.value.trim() || lane.key; if (state.include[old] !== undefined) { state.include[tapLaneType(lane)] = state.include[old]; delete state.include[old]; } saveTaps(); refreshTaps(); });
-      const count = document.createElement('span'); count.className = 'count'; count.textContent = `${lane.taps.length}`;
+      label.addEventListener('change', () => { const old = T.laneType(lane); lane.label = label.value.trim() || lane.key; for (const map of [state.include, state.maxPerType, state.holdPerType]) if (map[old] !== undefined) { map[T.laneType(lane)] = map[old]; delete map[old]; } saveTaps(); saveSettings(); refreshTaps(); });
+      const count = document.createElement('span'); count.className = 'count';
+      count.textContent = st.multi ? `${st.count} · ${st.multi} met ${st.takes - st.count + st.multi} takes · ±${st.meanSdMs.toFixed(0)} ms` : `${st.count}`;
+      count.title = st.multi ? 'tikken · tikken met meerdere takes · gemiddelde spreiding (standaardafwijking)' : 'tikken';
       const clear = document.createElement('button'); clear.type = 'button'; clear.textContent = 'wis'; clear.title = 'Alle tikken van deze lane verwijderen';
-      clear.addEventListener('click', () => { delete state.taps.lanes[lane.key]; state.undo = state.undo.filter((u) => u.key !== lane.key); saveTaps(); refreshTaps(); });
+      clear.addEventListener('click', () => { delete state.taps.lanes[lane.key]; state.undo = state.undo.filter((u) => u.key !== lane.key); if (state.selected && state.selected.key === lane.key) state.selected = null; saveTaps(); refreshTaps(); });
       row.append(key, label, count, clear);
       host.appendChild(row);
     }
+    const sel = $('tap-selected');
+    if (state.selected) {
+      const tap = state.selected.tap, sp = T.spread(tap);
+      sel.hidden = false;
+      sel.textContent = `geselecteerd: ${state.taps.lanes[state.selected.key]?.label || state.selected.key} @ ${fmt(tap.t)}${tap.dur ? ` → ${fmt(tap.t + tap.dur)}` : ''}${sp.n > 1 ? ` · ${sp.n} takes, ±${sp.sdMs.toFixed(0)} ms` : ''}${tap.manual ? ' · met de hand gezet' : ''} — pijltjes = 10 ms (shift 100 ms), Delete = weg, R = terug naar gemiddelde, Esc = los`;
+    } else sel.hidden = true;
   }
 
   /* Kalibratie: acht klikken op 120 BPM uit de Web Audio-klok; de speler tikt mee met een willekeurige
@@ -251,7 +262,7 @@
   function genOptions(extra) {
     return Object.assign({
       fileName: state.fileName || 'track.mp3', style: $('gen-style').value, names: $('gen-names').value,
-      holdSec: +$('gen-hold').value, holdMode: $('gen-hold-mode').value, minStrength: +$('gen-min-strength').value,
+      holdSec: +$('gen-hold').value, holdMode: $('gen-hold-mode').value, holdPerType: state.holdPerType, minStrength: +$('gen-min-strength').value,
       hud: $('gen-hud').checked, embedCurves: $('gen-curves').value,
       include: state.include, maxPerType: state.maxPerType, extraEvents: state.tapEvents,
     }, extra || {});
@@ -276,8 +287,8 @@
   }
   function renderIncludeGrid(counts) {
     const grid = $('include-grid');
-    grid.innerHTML = '<span class="head"></span><span class="head">cue-type</span><span class="head">gevonden</span><span class="head">max</span>';
-    const rows = LANES.map((l) => ({ type: l.type, label: l.label, own: false })).concat(tapLaneList().map((l) => ({ type: tapLaneType(l), label: `tik ${l.key} · ${l.label}`, own: true })));
+    grid.innerHTML = '<span class="head"></span><span class="head">cue-type</span><span class="head">gevonden</span><span class="head">max</span><span class="head" title="duur van een slag-cue voor dit type; leeg = de algemene waarde. Bij \'tot de volgende\' is dit het maximum.">duur s</span>';
+    const rows = LANES.map((l) => ({ type: l.type, label: l.label, own: false })).concat(tapLaneList().map((l) => ({ type: T.laneType(l), label: `tik ${l.key} · ${l.label}`, own: true })));
     for (const l of rows) {
       const cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = state.include[l.type] ?? l.own;
       cb.addEventListener('change', () => { state.include[l.type] = cb.checked; saveSettings(); regenerate(); draw(); });
@@ -285,7 +296,10 @@
       const count = document.createElement('span'); count.className = 'count'; count.textContent = counts[l.type] || 0;
       const max = document.createElement('input'); max.type = 'number'; max.min = 0; max.value = state.maxPerType[l.type] ?? 999;
       max.addEventListener('change', () => { state.maxPerType[l.type] = Math.max(0, +max.value || 0); saveSettings(); regenerate(); });
-      grid.append(cb, name, count, max);
+      const hold = document.createElement('input'); hold.type = 'number'; hold.min = 0.05; hold.step = 0.05; hold.placeholder = $('gen-hold').value;
+      if (INSTANT_TYPES.has(l.type) || l.own) { hold.value = state.holdPerType[l.type] ?? ''; } else { hold.disabled = true; hold.placeholder = 'duur'; }
+      hold.addEventListener('change', () => { const v = +hold.value; if (v > 0) state.holdPerType[l.type] = v; else { delete state.holdPerType[l.type]; hold.value = ''; } saveSettings(); regenerate(); });
+      grid.append(cb, name, count, max, hold);
     }
   }
 
@@ -302,7 +316,7 @@
   }
 
   // ───────────────────────── Tekenen ─────────────────────────
-  const allLanes = () => LANES.concat(tapLaneList().map((l) => ({ type: tapLaneType(l), label: `${l.key} · ${l.label}`, own: true })));
+  const allLanes = () => LANES.concat(tapLaneList().map((l) => ({ type: T.laneType(l), label: `${l.key} · ${l.label}`, own: true, key: l.key })));
   const timelineHeight = () => LANE_TOP + allLanes().length * ROWS.lane + 6;
   function fitCanvas(canvas, cssHeight) {
     const dpr = window.devicePixelRatio || 1;
@@ -312,6 +326,8 @@
     const ctx = canvas.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     return w;
   }
+  /* Muispositie t.o.v. het canvas uit clientX/Y: betrouwbaarder dan offsetX/Y, ook voor synthetische events. */
+  const pos = (ev, el) => { const r = el.getBoundingClientRect(); return { x: ev.clientX - r.left, y: ev.clientY - r.top }; };
   const xOf = (t, w) => (t - state.view.start) / (state.view.end - state.view.start) * w;
   const tOf = (x, w) => state.view.start + x / w * (state.view.end - state.view.start);
 
@@ -408,25 +424,25 @@
       }
     }
     if (state.frames && state.score) {
-      const y = ROWS.ruler + ROWS.wave + ROWS.spec, fh = ROWS.curves, fr = state.frames.frameRate, T = state.frames.times;
+      const y = ROWS.ruler + ROWS.wave + ROWS.spec, fh = ROWS.curves, fr = state.frames.frameRate, Tm = state.frames.times;
       const flux = state.frames.flux.all, scale = A.percentile(flux, 0.98) || 1;
       tctx.fillStyle = '#5a5a56';
       const fStart = Math.max(0, Math.floor(t0 * fr)), fEnd = Math.min(state.frames.count - 1, Math.ceil(t1 * fr));
       const perPx = Math.max(1, Math.floor((fEnd - fStart) / w));
       for (let f = fStart; f <= fEnd; f += perPx) {
         let m = 0; for (let k = f; k < f + perPx && k <= fEnd; k++) m = Math.max(m, flux[k]);
-        const v = Math.min(1, m / scale); tctx.fillRect(xOf(T[f], w), y + fh - v * (fh - 4), Math.max(1, w / (fEnd - fStart) * perPx), v * (fh - 4));
+        const v = Math.min(1, m / scale); tctx.fillRect(xOf(Tm[f], w), y + fh - v * (fh - 4), Math.max(1, w / (fEnd - fStart) * perPx), v * (fh - 4));
       }
       const nv = state.score.novelty; tctx.strokeStyle = '#e8e8e4'; tctx.lineWidth = 1; tctx.beginPath();
       for (let i = 0; i < nv.nWin; i++) { const x = xOf((i + 0.5) * nv.windowSec, w); const yy = y + fh - nv.novelty[i] * (fh - 4); i ? tctx.lineTo(x, yy) : tctx.moveTo(x, yy); }
       tctx.stroke();
       const { maxDb, floorDb } = state.score.levels; tctx.strokeStyle = '#ff3b3b'; tctx.globalAlpha = .7; tctx.beginPath();
-      for (let f = fStart; f <= fEnd; f += perPx) { const u = Math.max(0, Math.min(1, (state.frames.rmsDb[f] - floorDb) / (maxDb - floorDb))); const x = xOf(T[f], w), yy = y + fh - u * (fh - 4); f === fStart ? tctx.moveTo(x, yy) : tctx.lineTo(x, yy); }
+      for (let f = fStart; f <= fEnd; f += perPx) { const u = Math.max(0, Math.min(1, (state.frames.rmsDb[f] - floorDb) / (maxDb - floorDb))); const x = xOf(Tm[f], w), yy = y + fh - u * (fh - 4); f === fStart ? tctx.moveTo(x, yy) : tctx.lineTo(x, yy); }
       tctx.stroke(); tctx.globalAlpha = 1;
       tctx.fillStyle = '#6e6e68'; tctx.fillText('flux · nieuwheid · niveau', 4, y + 8);
     }
     if (state.score) {
-      const keys = state.genKeys || new Set();
+      const keys = state.genKeys;
       const lanes = allLanes();
       lanes.forEach((lane, i) => {
         const y = LANE_TOP + i * ROWS.lane;
@@ -438,22 +454,29 @@
           if (e.type !== lane.type) continue;
           const x = xOf(e.t, w); if (x < -2 || x > w + 2) { if (!(e.dur > 0 && xOf(e.t + e.dur, w) > 0 && x < w)) continue; }
           const on = keys.has(`${e.type}@${e.t.toFixed(4)}`);
+          const selected = lane.own && state.selected && state.selected.tap === e.tap;
+          if (lane.own && e.takes > 1) {   // spreiding van de takes als dunne balk
+            const sp = T.spread(e.tap);
+            tctx.fillStyle = 'rgba(255,59,59,0.35)'; tctx.fillRect(xOf(sp.min, w), y + ROWS.lane - 3, Math.max(1, xOf(sp.max, w) - xOf(sp.min, w)), 2);
+          }
           if (e.dur > 0) {
             const x2 = xOf(e.t + e.dur, w);
             tctx.fillStyle = lane.own ? (on ? 'rgba(255,59,59,0.35)' : 'rgba(255,59,59,0.12)') : on ? (lane.type === 'silence' ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.18)') : 'rgba(255,255,255,0.06)';
             tctx.fillRect(Math.max(0, x), y + 3, Math.min(w, x2) - Math.max(0, x), ROWS.lane - 6);
             tctx.fillStyle = lane.own ? '#ff3b3b' : on ? '#e8e8e4' : '#5a5a56'; tctx.fillRect(x, y + 2, 1, ROWS.lane - 4);
+            if (lane.own) tctx.fillRect(x2 - 1, y + 2, 1, ROWS.lane - 4);
             if (lane.type === 'section' && x2 - x > 60) { tctx.fillStyle = on ? '#e8e8e4' : '#5a5a56'; tctx.fillText(e.label, Math.max(0, x) + 52, y + ROWS.lane / 2); }
           } else {
             const hgt = 4 + e.strength * (ROWS.lane - 8);
             tctx.fillStyle = lane.own ? (on ? '#ff3b3b' : 'rgba(255,59,59,0.4)') : on ? (lane.type === 'drop' || lane.type === 'peak' ? '#ff3b3b' : '#e8e8e4') : '#4a4a46';
             tctx.fillRect(x - (lane.type === 'bar' || lane.own ? 1 : 0.5), y + ROWS.lane - 2 - hgt, lane.type === 'bar' || lane.own ? 2 : 1, hgt);
+            if (lane.own && e.manual) { tctx.fillStyle = '#fff'; tctx.fillRect(x - 1, y + 2, 2, 2); }
           }
+          if (selected) { tctx.strokeStyle = '#fff'; tctx.lineWidth = 1; tctx.strokeRect(x - 3.5, y + 1.5, (e.dur > 0 ? xOf(e.t + e.dur, w) - x : 0) + 7, ROWS.lane - 3); }
         }
       });
-      // toetsen die nu ingedrukt zijn: lopende duur-cue
       for (const key in state.tapDown) {
-        const lane = state.taps.lanes[key]; const idx = lane ? lanes.findIndex((l) => l.type === tapLaneType(lane)) : -1;
+        const lane = state.taps.lanes[key]; const idx = lane ? lanes.findIndex((l) => l.type === T.laneType(lane)) : -1;
         const y = idx >= 0 ? LANE_TOP + idx * ROWS.lane : LANE_TOP + lanes.length * ROWS.lane - ROWS.lane;
         tctx.fillStyle = 'rgba(255,0,0,0.5)'; tctx.fillRect(xOf(state.tapDown[key].start, w), y + 3, Math.max(2, xOf(audio.currentTime, w) - xOf(state.tapDown[key].start, w)), ROWS.lane - 6);
       }
@@ -473,32 +496,83 @@
     $('zoom').value = Math.log2(dur / span);
     draw();
   }
+  /* Welke eigen tik ligt onder de muis? Geeft { event, mode } met mode 'move' of 'resize' (rechterrand van een duur-cue). */
+  function tapAt(x, y, w) {
+    if (y < LANE_TOP) return null;
+    const lanes = allLanes();
+    const lane = lanes[Math.floor((y - LANE_TOP) / ROWS.lane)];
+    if (!lane || !lane.own) return null;
+    const tol = 6 / w * (state.view.end - state.view.start), t = tOf(x, w);
+    let best = null, bd = Infinity;
+    for (const e of state.tapEvents) {
+      if (e.type !== lane.type) continue;
+      if (e.dur > 0 && Math.abs(e.t + e.dur - t) <= tol) return { event: e, mode: 'resize' };
+      const d = e.dur > 0 && t >= e.t && t <= e.t + e.dur ? 0 : Math.abs(e.t - t);
+      if (d <= tol && d < bd) { bd = d; best = e; }
+    }
+    return best ? { event: best, mode: 'move' } : null;
+  }
   timeline.addEventListener('wheel', (ev) => {
+    const p = pos(ev, timeline);
     if (!state.samples) return; ev.preventDefault();
-    const w = timeline.clientWidth, t = tOf(ev.offsetX, w), span = state.view.end - state.view.start;
+    const w = timeline.clientWidth, t = tOf(p.x, w), span = state.view.end - state.view.start;
     const factor = Math.exp(ev.deltaY * 0.0015);
     const ns = span * factor, u = (t - state.view.start) / span;
     setView(t - u * ns, t - u * ns + ns);
   }, { passive: false });
-  timeline.addEventListener('pointerdown', (ev) => { state.drag = { x: ev.offsetX, start: state.view.start, moved: false }; timeline.setPointerCapture(ev.pointerId); });
-  timeline.addEventListener('pointermove', (ev) => {
+  timeline.addEventListener('pointerdown', (ev) => {
+    const p = pos(ev, timeline);
     const w = timeline.clientWidth;
+    const hit = state.samples ? tapAt(p.x, p.y, w) : null;
+    try { timeline.setPointerCapture(ev.pointerId); } catch (e) { /* synthetische events hebben geen pointer */ }
+    if (hit) {
+      state.selected = { key: hit.event.laneKey, tap: hit.event.tap };
+      state.tapDrag = { key: hit.event.laneKey, tap: hit.event.tap, mode: hit.mode, x0: p.x, t0: hit.event.tap.t, dur0: hit.event.tap.dur, moved: false };
+      renderTapLanes(); draw();
+      return;
+    }
+    if (state.selected && p.y >= LANE_TOP) { state.selected = null; renderTapLanes(); }
+    state.drag = { x: p.x, start: state.view.start, moved: false };
+  });
+  timeline.addEventListener('pointermove', (ev) => {
+    const p = pos(ev, timeline);
+    const w = timeline.clientWidth;
+    if (state.tapDrag) {
+      const d = state.tapDrag, dt = (p.x - d.x0) / w * (state.view.end - state.view.start);
+      if (Math.abs(p.x - d.x0) > 2) d.moved = true;
+      if (!d.moved) return;
+      if (d.mode === 'move') T.moveTap(d.tap, d.t0 + dt, state.duration); else T.resizeTap(d.tap, d.dur0 + dt);
+      refreshTapsLight(); return;
+    }
     if (state.drag) {
-      const dx = ev.offsetX - state.drag.x;
+      const dx = p.x - state.drag.x;
       if (Math.abs(dx) > 3) state.drag.moved = true;
       if (state.drag.moved) { const span = state.view.end - state.view.start; setView(state.drag.start - dx / w * span, state.drag.start - dx / w * span + span); }
       return;
     }
-    showTooltip(ev, tOf(ev.offsetX, w), w);
+    const hit = state.samples ? tapAt(p.x, p.y, w) : null;
+    timeline.style.cursor = hit ? (hit.mode === 'resize' ? 'ew-resize' : 'grab') : 'crosshair';
+    showTooltip(ev, tOf(p.x, w), w);
   });
   timeline.addEventListener('pointerup', (ev) => {
-    if (state.drag && !state.drag.moved && state.samples) { audio.currentTime = Math.max(0, Math.min(state.duration, tOf(ev.offsetX, timeline.clientWidth))); draw(); }
+    const p = pos(ev, timeline);
+    if (state.tapDrag) { if (state.tapDrag.moved) { saveTaps(); refreshTaps(); } state.tapDrag = null; return; }
+    if (state.drag && !state.drag.moved && state.samples) { audio.currentTime = Math.max(0, Math.min(state.duration, tOf(p.x, timeline.clientWidth))); draw(); }
     state.drag = null;
   });
   timeline.addEventListener('pointerleave', () => { $('tooltip').hidden = true; });
+  /* Tijdens het slepen alleen de cues en de tekening verversen; de sketch volgt bij het loslaten. */
+  function refreshTapsLight() {
+    const snap = $('tap-snap').value, tolSec = +$('tap-snap-tol').value / 1000;
+    let snapTargets = [];
+    if (state.score && snap === 'onset') snapTargets = Object.values(state.score.onsets).flat().map((o) => o.t);
+    if (state.score && snap === 'beat') snapTargets = state.score.beats.map((b) => b.t);
+    state.tapEvents = T.toEvents(state.taps, { snapTargets, tolSec, duration: state.duration || Infinity });
+    renderTapLanes(); draw();
+  }
   overview.addEventListener('pointerdown', (ev) => {
     if (!state.samples) return;
-    const t = ev.offsetX / overview.clientWidth * state.duration, span = state.view.end - state.view.start;
+    const t = pos(ev, overview).x / overview.clientWidth * state.duration, span = state.view.end - state.view.start;
     if (ev.shiftKey) { audio.currentTime = t; draw(); } else setView(t - span / 2, t + span / 2);
   });
   $('zoom').addEventListener('input', () => {
@@ -511,20 +585,28 @@
     if (!state.score) return;
     const tip = $('tooltip');
     const tol = 6 / w * (state.view.end - state.view.start);
-    const y = ev.offsetY;
+    const y = pos(ev, timeline).y;
     let lines = [fmt(t)];
     if (y >= LANE_TOP) {
       const lanes = allLanes();
       const lane = lanes[Math.min(lanes.length - 1, Math.floor((y - LANE_TOP) / ROWS.lane))];
       const source = lane.own ? state.tapEvents : state.score.events;
       const near = source.filter((e) => e.type === lane.type && (Math.abs(e.t - t) <= tol || (e.dur > 0 && t >= e.t && t <= e.t + e.dur))).slice(0, 3);
-      for (const e of near) lines.push(`${e.label}  @ ${fmt(e.t)}${e.dur ? ' → ' + fmt(e.t + e.dur) : ''}${e.dur || lane.own ? '' : '  sterkte ' + e.strength.toFixed(2)}${lane.own && e.raw != null && Math.abs(e.raw - e.t) > 0.0005 ? `  (getikt ${fmt(e.raw)})` : ''}`);
+      for (const e of near) {
+        let line = `${e.label}  @ ${fmt(e.t)}${e.dur ? ' → ' + fmt(e.t + e.dur) : ''}${e.dur || lane.own ? '' : '  sterkte ' + e.strength.toFixed(2)}`;
+        if (lane.own) {
+          if (e.raw != null && Math.abs(e.raw - e.t) > 0.0005) line += `  (getikt ${fmt(e.raw)})`;
+          if (e.takes > 1) line += `\n   takes: ${e.tap.takes.map((k) => fmt(k.t)).join(', ')}  bereik ${e.rangeMs.toFixed(0)} ms`;
+          line += '\n   sleep = verplaats · rechterrand = duur · klik = selecteer';
+        }
+        lines.push(line);
+      }
     } else if (state.frames) {
       const f = Math.max(0, Math.min(state.frames.count - 1, Math.round(t * state.frames.frameRate)));
       lines.push(`niveau ${state.frames.rmsDb[f].toFixed(1)} dBFS · centroid ${state.frames.centroid[f].toFixed(0)} Hz · vlakheid ${state.frames.flatness[f].toFixed(2)}`);
     }
     tip.textContent = lines.join('\n'); tip.hidden = false;
-    tip.style.left = Math.min(window.innerWidth - 330, ev.clientX + 14) + 'px'; tip.style.top = ev.clientY + 14 + 'px';
+    tip.style.left = Math.min(window.innerWidth - 360, ev.clientX + 14) + 'px'; tip.style.top = ev.clientY + 14 + 'px';
   }
 
   // Transport
@@ -541,12 +623,18 @@
     if (!audio.paused) state.raf = requestAnimationFrame(tick);
   }
 
-  // Toetsen: spatie = afspelen, backspace = laatste tik weg, letter/cijfer = tik in die lane
+  // Toetsen: spatie = afspelen, backspace = laatste tik weg (of de geselecteerde), pijltjes = geselecteerde
+  // tik verschuiven, Delete = geselecteerde weg, R = terug naar het gemiddelde, Esc = selectie los,
+  // letter/cijfer = tik in die lane
   const inField = () => ['INPUT', 'SELECT', 'TEXTAREA'].includes(document.activeElement.tagName);
   window.addEventListener('keydown', (ev) => {
     if (inField() || ev.ctrlKey || ev.metaKey || ev.altKey) return;
     if (ev.code === 'Space') { if (state.samples) { ev.preventDefault(); $('play').click(); } return; }
-    if (ev.key === 'Backspace') { ev.preventDefault(); undoTap(); return; }
+    if (ev.key === 'Backspace') { ev.preventDefault(); if (state.selected) deleteSelected(); else undoTap(); return; }
+    if (ev.key === 'Delete') { ev.preventDefault(); deleteSelected(); return; }
+    if (ev.key === 'Escape') { state.selected = null; renderTapLanes(); draw(); return; }
+    if (state.selected && (ev.key === 'ArrowLeft' || ev.key === 'ArrowRight')) { ev.preventDefault(); nudgeSelected((ev.key === 'ArrowLeft' ? -1 : 1) * (ev.shiftKey ? 0.1 : 0.01)); return; }
+    if (state.selected && ev.key.toLowerCase() === 'r' && !ev.repeat) { T.resetTap(state.selected.tap); saveTaps(); refreshTaps(); return; }
     if (ev.repeat || !/^[a-z0-9]$/i.test(ev.key)) return;
     if (document.activeElement.tagName === 'BUTTON') document.activeElement.blur();
     if (state.calib) { state.calib.taps.push(state.calib.ctx.currentTime); return; }
@@ -580,11 +668,11 @@
   const detectIds = ['sens-low', 'sens-mid', 'sens-high', 'onset-gap', 'bpm-min', 'bpm-max', 'bpm-prior', 'tightness', 'tempo-octave', 'meter', 'section-kernel', 'section-min', 'section-sens', 'peak-count', 'silence-drop', 'drop-db'];
   for (const id of detectIds) $(id).addEventListener('input', () => { syncValue(id); saveSettings(); clearTimeout(detectTimer); detectTimer = setTimeout(runDetect, 150); });
   ['gen-style', 'gen-names', 'gen-curves', 'gen-hud', 'gen-hold-mode'].forEach((id) => $(id).addEventListener('change', () => { saveSettings(); regenerate(); }));
-  ['gen-hold', 'gen-min-strength'].forEach((id) => $(id).addEventListener('input', () => { syncValue(id); saveSettings(); regenerate(); draw(); }));
-  ['tap-snap', 'tap-snap-tol', 'tap-latency'].forEach((id) => $(id).addEventListener('input', () => { syncValue(id); saveSettings(); refreshTaps(); }));
+  ['gen-hold', 'gen-min-strength'].forEach((id) => $(id).addEventListener('input', () => { syncValue(id); saveSettings(); regenerate(); draw(); if (id === 'gen-hold') document.querySelectorAll('#include-grid input[type=number][step]').forEach((el) => { el.placeholder = $('gen-hold').value; }); }));
+  ['tap-snap', 'tap-snap-tol', 'tap-latency', 'tap-round', 'tap-merge'].forEach((id) => $(id).addEventListener('input', () => { syncValue(id); saveSettings(); refreshTaps(); }));
   $('follow').addEventListener('change', saveSettings);
   $('tap-calibrate').addEventListener('click', calibrate);
-  $('tap-clear').addEventListener('click', () => { if (!Object.keys(state.taps.lanes).length || confirm('Alle eigen tikken van dit bestand wissen?')) { state.taps = { lanes: {} }; state.undo = []; saveTaps(); refreshTaps(); } });
+  $('tap-clear').addEventListener('click', () => { if (!Object.keys(state.taps.lanes).length || confirm('Alle eigen tikken van dit bestand wissen?')) { state.taps = T.normalize({ lanes: {} }); state.undo = []; state.selected = null; saveTaps(); refreshTaps(); } });
   $('tap-undo').addEventListener('click', undoTap);
   $('reset-settings').addEventListener('click', () => { localStorage.removeItem(SETTINGS_KEY); location.reload(); });
   function syncValue(id) { const el = document.querySelector(`.value[data-for="${id}"]`); if (!el) return; const v = +$(id).value; el.textContent = +$(id).step >= 1 ? String(v) : v.toFixed(2); }
