@@ -87,7 +87,7 @@
       await analyze();
     } catch (err) {
       hideProgress();
-      $('stats').textContent = `Kon het bestand niet decoderen: ${err.message || err}`;
+      $('stats').textContent = `Dit bestand kon niet gelezen worden (${err.message || err}). Probeer een mp3, wav, ogg of flac.`;
       console.error(err);
     }
   }
@@ -215,14 +215,18 @@
       const st = T.laneStats(lane);
       const row = document.createElement('div'); row.className = 'tap-lane' + (state.activeLane === lane.key ? ' active' : '');
       const key = document.createElement('button'); key.type = 'button'; key.className = 'key'; key.textContent = lane.key; key.title = 'Lane-opties: hele lane verschuiven';
+      key.setAttribute('aria-label', `Opties voor lane ${lane.key}: alles verschuiven`); key.setAttribute('aria-expanded', state.activeLane === lane.key ? 'true' : 'false');
       key.addEventListener('click', () => { state.activeLane = state.activeLane === lane.key ? null : lane.key; renderTapLanes(); });
-      const label = document.createElement('input'); label.type = 'text'; label.value = lane.label; label.title = 'Naam van deze lane; wordt de functienaam in de sketch'; label.maxLength = 24;
+      const label = document.createElement('input'); label.type = 'text'; label.value = lane.label; label.maxLength = 24; label.setAttribute('aria-label', `Naam van lane ${lane.key}; wordt de functienaam in de sketch`);
       label.addEventListener('change', () => { const old = T.laneType(lane); lane.label = label.value.trim() || lane.key; for (const map of [state.include, state.maxPerType, state.holdPerType]) if (map[old] !== undefined) { map[T.laneType(lane)] = map[old]; delete map[old]; } saveTaps(); saveSettings(); refreshTaps(); });
       const count = document.createElement('span'); count.className = 'count';
       count.textContent = st.multi ? `${st.count} · ${st.multi} met ${st.takes - st.count + st.multi} takes · ±${st.meanSdMs.toFixed(0)} ms` : `${st.count}`;
       count.title = st.multi ? 'tikken · tikken met meerdere takes · gemiddelde spreiding (standaardafwijking)' : 'tikken';
-      const clear = document.createElement('button'); clear.type = 'button'; clear.textContent = 'wis'; clear.title = 'Alle tikken van deze lane verwijderen';
-      clear.addEventListener('click', () => { delete state.taps.lanes[lane.key]; state.undo = state.undo.filter((u) => u.key !== lane.key); if (state.selected && state.selected.key === lane.key) state.selected = null; saveTaps(); refreshTaps(); });
+      const clear = document.createElement('button'); clear.type = 'button'; clear.textContent = 'Wis lane'; clear.setAttribute('aria-label', `Wis lane ${lane.key} (${lane.label})`);
+      clear.addEventListener('click', () => {
+        if (!confirm(`Lane ${lane.key} · ${lane.label} met ${lane.taps.length} tik${lane.taps.length === 1 ? '' : 'ken'} wissen? Dit is niet ongedaan te maken.`)) return;
+        delete state.taps.lanes[lane.key]; state.undo = state.undo.filter((u) => u.key !== lane.key); if (state.selected && state.selected.key === lane.key) state.selected = null; saveTaps(); refreshTaps();
+      });
       row.append(key, label, count, clear);
       host.appendChild(row);
       if (state.activeLane === lane.key) host.appendChild(renderLaneDetail(lane));
@@ -237,8 +241,8 @@
     const apply = (dt) => { if (!dt) return; T.shiftLane(lane, dt, state.duration); saveTaps(); refreshTaps(); };
     const row1 = document.createElement('div'); row1.className = 'tap-detail-row';
     const lbl = document.createElement('span'); lbl.textContent = `lane ${lane.key} · ${lane.label}: alles verschuiven`;
-    const inp = document.createElement('input'); inp.type = 'number'; inp.step = 5; inp.value = 0; inp.title = 'milliseconden; negatief = vroeger';
-    const go = btn('toepassen', () => { apply((+inp.value || 0) / 1000); inp.value = 0; });
+    const inp = document.createElement('input'); inp.type = 'number'; inp.step = 5; inp.value = 0; inp.setAttribute('aria-label', 'Verschuiving in milliseconden, negatief is vroeger');
+    const go = btn('Pas toe', () => { apply((+inp.value || 0) / 1000); inp.value = 0; });
     const minus = btn('−10 ms', () => apply(-0.01)), plus = btn('+10 ms', () => apply(0.01));
     row1.append(lbl, inp, go, minus, plus);
     box.appendChild(row1);
@@ -270,7 +274,7 @@
       tap.takes.slice().sort((a, b) => a.t - b.t).forEach((take, i) => {
         const row = document.createElement('div'); row.className = 'take';
         const x = btn('×', () => { T.removeTake(state.taps, key, tap, take); state.undo = state.undo.filter((u) => u.take !== take); saveTaps(); refreshTaps(); });
-        x.title = 'deze take verwijderen';
+        x.setAttribute('aria-label', `Verwijder take ${i + 1}`);
         const d = (take.t - (tap.manual ? sp.n > 1 ? (sp.min + sp.max) / 2 : take.t : tap.t)) * 1000;
         const txt = document.createElement('span'); txt.textContent = `take ${i + 1} · ${fmt(take.t)}${sp.n > 1 ? ` (${d >= 0 ? '+' : ''}${d.toFixed(0)} ms)` : ''}${take.dur ? ` · duur ${take.dur.toFixed(2)} s` : ''}`;
         row.append(x, txt); list.appendChild(row);
@@ -327,7 +331,7 @@
   }
   function showTab(tab) {
     state.tab = tab;
-    document.querySelectorAll('.output-tab').forEach((b) => b.classList.toggle('active', b.dataset.tab === tab));
+    document.querySelectorAll('.output-tab').forEach((b) => { const on = b.dataset.tab === tab; b.classList.toggle('active', on); b.setAttribute('aria-pressed', on ? 'true' : 'false'); });
     const out = $('output'), pane = $('preview-pane');
     const isPreview = tab === 'preview';
     out.hidden = isPreview; pane.hidden = !isPreview;
@@ -342,13 +346,14 @@
     grid.innerHTML = '<span class="head"></span><span class="head">cue-type</span><span class="head">gevonden</span><span class="head">max</span><span class="head" title="duur van een slag-cue voor dit type; leeg = de algemene waarde. Bij \'tot de volgende\' is dit het maximum.">duur s</span>';
     const rows = LANES.map((l) => ({ type: l.type, label: l.label, own: false })).concat(tapLaneList().map((l) => ({ type: T.laneType(l), label: `tik ${l.key} · ${l.label}`, own: true })));
     for (const l of rows) {
-      const cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = state.include[l.type] ?? l.own;
+      const id = 'inc-' + l.type.replace(/[^a-z0-9]+/gi, '-');
+      const cb = document.createElement('input'); cb.type = 'checkbox'; cb.id = id; cb.checked = state.include[l.type] ?? l.own;
       cb.addEventListener('change', () => { state.include[l.type] = cb.checked; saveSettings(); regenerate(); draw(); });
-      const name = document.createElement('span'); name.className = 'lane-name' + (l.own ? ' own' : ''); name.innerHTML = `<i></i>${esc(l.label)}`;
+      const name = document.createElement('label'); name.className = 'lane-name' + (l.own ? ' own' : ''); name.htmlFor = id; name.innerHTML = `<i></i>${esc(l.label)}`;
       const count = document.createElement('span'); count.className = 'count'; count.textContent = counts[l.type] || 0;
-      const max = document.createElement('input'); max.type = 'number'; max.min = 0; max.value = state.maxPerType[l.type] ?? 999;
+      const max = document.createElement('input'); max.type = 'number'; max.min = 0; max.value = state.maxPerType[l.type] ?? 999; max.setAttribute('aria-label', `Maximum aantal cues voor ${l.label}`);
       max.addEventListener('change', () => { state.maxPerType[l.type] = Math.max(0, +max.value || 0); saveSettings(); regenerate(); });
-      const hold = document.createElement('input'); hold.type = 'number'; hold.min = 0.05; hold.step = 0.05; hold.placeholder = $('gen-hold').value;
+      const hold = document.createElement('input'); hold.type = 'number'; hold.min = 0.05; hold.step = 0.05; hold.placeholder = $('gen-hold').value; hold.setAttribute('aria-label', `Duur in seconden van een slag-cue voor ${l.label}`);
       if (INSTANT_TYPES.has(l.type) || l.own) { hold.value = state.holdPerType[l.type] ?? ''; } else { hold.disabled = true; hold.placeholder = 'duur'; }
       hold.addEventListener('change', () => { const v = +hold.value; if (v > 0) state.holdPerType[l.type] = v; else { delete state.holdPerType[l.type]; hold.value = ''; } saveSettings(); regenerate(); });
       grid.append(cb, name, count, max, hold);
@@ -711,7 +716,7 @@
       const r = await fetch('brunk.mp3'); if (!r.ok) throw Error(r.status + ' ' + r.statusText);
       const blob = await r.blob();
       loadFile(new File([blob], 'brunk.mp3', { type: blob.type || 'audio/mpeg' }));
-    } catch (err) { hideProgress(); $('stats').textContent = 'Voorbeeld niet gevonden: ' + err.message; }
+    } catch (err) { hideProgress(); $('stats').textContent = `brunk.mp3 staat niet naast index.html (${err.message}). Zet het bestand in de map, of sleep een eigen mp3 in het vak links.`; }
   });
 
   // Parameters: STFT via knop, detectoren live (gedebounced), generator direct
@@ -726,7 +731,7 @@
   ['tap-snap', 'tap-snap-tol', 'tap-latency', 'tap-round', 'tap-merge'].forEach((id) => $(id).addEventListener('input', () => { syncValue(id); saveSettings(); refreshTaps(); }));
   $('follow').addEventListener('change', saveSettings);
   $('tap-calibrate').addEventListener('click', calibrate);
-  $('tap-clear').addEventListener('click', () => { if (!Object.keys(state.taps.lanes).length || confirm('Alle eigen tikken van dit bestand wissen?')) { state.taps = T.normalize({ lanes: {} }); state.undo = []; state.selected = null; saveTaps(); refreshTaps(); } });
+  $('tap-clear').addEventListener('click', () => { if (!Object.keys(state.taps.lanes).length || confirm(`Alle eigen tikken van ${state.fileName || 'dit bestand'} wissen? Dit is niet ongedaan te maken.`)) { state.taps = T.normalize({ lanes: {} }); state.undo = []; state.selected = null; saveTaps(); refreshTaps(); } });
   $('tap-undo').addEventListener('click', undoTap);
   $('reset-settings').addEventListener('click', () => { localStorage.removeItem(SETTINGS_KEY); location.reload(); });
   function syncValue(id) { const el = document.querySelector(`.value[data-for="${id}"]`); if (!el) return; const v = +$(id).value; el.textContent = +$(id).step >= 1 ? String(v) : v.toFixed(2); }
@@ -754,10 +759,13 @@
   function flash(btn, text) { const old = btn.textContent; btn.textContent = text; setTimeout(() => { btn.textContent = old; }, 1200); }
 
   // Over
-  $('open-about').addEventListener('click', () => { $('about-modal').hidden = false; });
-  document.querySelectorAll('#about-modal [data-close]').forEach((el) => el.addEventListener('click', () => { $('about-modal').hidden = true; }));
+  $('open-about').addEventListener('click', () => $('about-modal').showModal());
 
-  function showProgress(p, text) { $('progress').hidden = false; $('progress-bar').style.width = (p * 100).toFixed(0) + '%'; $('progress-text').textContent = text; }
+  function showProgress(p, text) {
+    $('progress').hidden = false; $('progress-text').textContent = text;
+    const bar = $('progress-bar');
+    if (p > 0) bar.value = p; else bar.removeAttribute('value');   // zonder waarde = onbepaald (decoderen)
+  }
   function hideProgress() { $('progress').hidden = true; }
   function esc(s) { return String(s).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c])); }
 

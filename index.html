@@ -7,8 +7,8 @@
   <meta name="description" content="Laad een geluidsbestand, laat het lab de muziek ontleden met FFT (onsets, tempo, secties, pieken, stiltes) en krijg een p5.js-sketch met lege functies op de juiste tijdstippen in draw()." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Inter:wght@400;500&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="style.css?v=4" />
+  <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600&family=Inter:wght@400;500&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css?v=7" />
 </head>
 <body>
   <nav id="navbar" aria-label="Projectlinks">
@@ -36,10 +36,10 @@
         </label>
         <div class="file-meta" id="file-meta">Nog geen bestand.</div>
         <div class="scene-actions">
-          <button id="load-example" type="button" class="badge-button" title="Laadt brunk.mp3 uit deze map">Voorbeeld: brunk.mp3</button>
-          <button id="open-about" type="button" class="badge-button">Over</button>
+          <button id="load-example" type="button" class="badge-button">Laad voorbeeld (brunk.mp3)</button>
+          <button id="open-about" type="button" class="badge-button">Lees hoe het werkt</button>
         </div>
-        <div class="progress" id="progress" hidden><div class="progress-bar" id="progress-bar"></div><span id="progress-text">decoderen…</span></div>
+        <div class="progress-row" id="progress" hidden><progress id="progress-bar" max="1" aria-labelledby="progress-text"></progress><span id="progress-text" class="hint" role="status" aria-live="polite">decoderen…</span></div>
       </section>
 
       <section class="control-group">
@@ -97,11 +97,11 @@
         <label><span class="label-text">Snap-tolerantie (ms)</span><input id="tap-snap-tol" type="range" min="10" max="200" step="5" value="60" /><span class="value" data-for="tap-snap-tol">60</span></label>
         <div id="tap-lanes" class="tap-lanes"></div>
         <div class="hint tap-selected" id="tap-selected" hidden></div>
-        <div class="scene-actions"><button id="tap-undo" type="button" class="badge-button">Laatste tik weg</button><button id="tap-clear" type="button" class="badge-button">Alles wissen</button></div>
+        <div class="scene-actions"><button id="tap-undo" type="button" class="badge-button">Maak laatste tik ongedaan</button><button id="tap-clear" type="button" class="badge-button">Wis alle tikken</button></div>
       </section>
 
       <section class="control-group">
-        <button id="reset-settings" type="button" class="wide" title="Alle schuiven en keuzes terug naar de standaardwaarden; eigen tikken blijven staan">Standaardwaarden</button>
+        <button id="reset-settings" type="button" class="wide">Herstel standaardwaarden</button>
         <div class="hint">Instellingen en eigen tikken worden in deze browser bewaard (localStorage), per bestand.</div>
       </section>
     </aside>
@@ -113,7 +113,7 @@
         <span class="time" id="time">00:00.000</span>
         <span class="sep">/</span>
         <span class="time" id="duration">00:00.000</span>
-        <span class="badge" id="bpm-badge">— BPM</span>
+        <span class="badge" id="bpm-badge" aria-live="polite">— BPM</span>
         <label class="inline"><input id="follow" type="checkbox" checked /><span>Volg de afspeelkop</span></label>
         <label class="inline"><span>Zoom</span><input id="zoom" type="range" min="0" max="6" step="0.01" value="0" /></label>
         <span class="hint" id="view-hint">scroll = zoom · sleep = schuif · klik = spring</span>
@@ -157,8 +157,8 @@
           <div class="editor-actions">
             <button id="copy-output" type="button">Kopieer</button>
             <button id="download-output" type="button">Download</button>
-            <button id="download-midi" type="button" title="Alle gekozen cues als MIDI-noten (slagwerk op kanaal 10, secties en eigen lanes op kanaal 1)">MIDI</button>
-            <button id="download-all" type="button" title="sketch.js, index.html, score.json en MIDI">Alles</button>
+            <button id="download-midi" type="button">Download MIDI</button>
+            <button id="download-all" type="button">Download alles</button>
           </div>
         </div>
         <textarea id="output" class="output" readonly spellcheck="false" wrap="off" placeholder="Hier verschijnt de gegenereerde sketch."></textarea>
@@ -170,10 +170,8 @@
     </aside>
   </div>
 
-  <div class="modal" id="about-modal" hidden>
-    <div class="modal-backdrop" data-close></div>
-    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="about-title">
-      <div class="modal-header"><h2 id="about-title">Over dit lab</h2><button class="modal-close" type="button" data-close aria-label="Sluiten">×</button></div>
+  <dialog class="about" id="about-modal" closedby="any" aria-labelledby="about-title">
+      <div class="modal-header"><h2 id="about-title">Hoe dit lab werkt</h2><form method="dialog"><button class="modal-close" type="submit" aria-label="Sluit" autofocus>×</button></form></div>
       <div class="modal-body">
         <p>Het lab decodeert het bestand met de Web Audio API, mengt het naar mono en rekent een korte-tijd-Fourier-transformatie (STFT) uit over het hele nummer: één FFT per hop, met een Hann-venster. Dat is één keer rekenwerk; alle detectoren werken daarna op die frames en reageren meteen op de schuiven.</p>
         <ul>
@@ -186,12 +184,11 @@
         </ul>
         <p>De gegenereerde sketch bevat lege functies in tijdsvolgorde en roept ze vanuit <code>draw()</code> aan op de klok van het geluidsbestand. Zie <a href="METHODE.md" target="_blank" rel="noopener">METHODE.md</a> voor formules, keuzes en beperkingen.</p>
       </div>
-    </div>
-  </div>
+  </dialog>
 
   <script src="soundline-analysis.js?v=4"></script>
   <script src="soundline-taps.js?v=2"></script>
   <script src="soundline-codegen.js?v=6"></script>
-  <script src="app.js?v=6"></script>
+  <script src="app.js?v=7"></script>
 </body>
 </html>

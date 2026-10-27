@@ -29,7 +29,7 @@
       $('result').hidden = false; $('output').hidden = false;
       update();
       requestAnimationFrame(runPreview);   // na de eerste lay-out, zodat de preview de echte breedte kent
-    } catch (err) { $('progress').hidden = true; $('status').textContent = 'Kon het bestand niet lezen: ' + (err.message || err); console.error(err); }
+    } catch (err) { $('progress').hidden = true; $('status').textContent = `Dit bestand kon niet gelezen worden (${err.message || err}). Probeer een mp3, wav, ogg of flac.`; console.error(err); }
   }
 
   function update() {
@@ -43,9 +43,11 @@
     const list = $('moment-list'); list.innerHTML = '';
     state.moments.forEach((m, i) => {
       const li = document.createElement('li'); li.dataset.index = i;
-      li.innerHTML = `<span class="t">${fmt(m.t)}</span>${esc(m.label)} <span class="hint">· ${m.dur.toFixed(1)} s</span><span class="fn">${esc(state.gen.names[i])}</span>`;
-      li.addEventListener('click', () => { audio.currentTime = m.t; draw(); });
-      list.appendChild(li);
+      const b = document.createElement('button'); b.type = 'button';
+      b.innerHTML = `<span class="n">${i + 1}</span><span class="t">${fmt(m.t)}</span><span>${esc(m.label)}</span><span class="hint">${m.dur.toFixed(1)} s</span><span class="fn">${esc(state.gen.names[i])}</span>`;
+      b.setAttribute('aria-label', `Spring naar moment ${i + 1}, ${m.label}, op ${fmt(m.t)}`);
+      b.addEventListener('click', () => { audio.currentTime = m.t; draw(); });
+      li.appendChild(b); list.appendChild(li);
     });
     draw();
   }
@@ -109,7 +111,7 @@
   document.body.addEventListener('drop', (ev) => { ev.preventDefault(); if (ev.dataTransfer.files[0]) loadFile(ev.dataTransfer.files[0]); });
   $('load-example').addEventListener('click', async () => {
     try { progress(0, 'brunk.mp3 ophalen…'); const r = await fetch('brunk.mp3'); if (!r.ok) throw Error(r.status); const blob = await r.blob(); loadFile(new File([blob], 'brunk.mp3', { type: blob.type || 'audio/mpeg' })); }
-    catch (err) { $('progress').hidden = true; $('status').textContent = 'Voorbeeld niet gevonden: ' + err.message; }
+    catch (err) { $('progress').hidden = true; $('status').textContent = `brunk.mp3 staat niet naast voorbeeld.html (${err.message}). Zet het bestand in de map, of sleep een eigen mp3 in het vak.`; }
   });
   $('moments').addEventListener('input', () => { $('moments-value').textContent = $('moments').value; update(); });
   $('moments').addEventListener('change', runPreview);
@@ -128,7 +130,7 @@
   window.addEventListener('keydown', (ev) => { if (ev.code === 'Space' && state.samples && !['INPUT', 'TEXTAREA', 'BUTTON'].includes(document.activeElement.tagName)) { ev.preventDefault(); $('play').click(); } });
   window.addEventListener('resize', draw);
 
-  function progress(p, text) { $('progress').hidden = false; $('progress-bar').style.width = (p * 100).toFixed(0) + '%'; $('progress-text').textContent = text; }
+  function progress(p, text) { $('progress').hidden = false; $('progress-text').textContent = text; const bar = $('progress-bar'); if (p > 0) bar.value = p; else bar.removeAttribute('value'); }
   function esc(s) { return String(s).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c])); }
   window.soundlineSimple = state;
 })();

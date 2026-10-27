@@ -7,9 +7,9 @@
   <meta name="description" content="Eén geluidsbestand, hoogstens tien visuele momenten, één p5.js-sketch die meteen iets laat zien. Het eenvoudige voorbeeld van p5.soundline." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Inter:wght@400;500&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="style.css?v=4" />
-  <link rel="stylesheet" href="voorbeeld.css?v=1" />
+  <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600&family=Inter:wght@400;500&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css?v=7" />
+  <link rel="stylesheet" href="voorbeeld.css?v=2" />
 </head>
 <body class="simple">
   <nav id="navbar" aria-label="Projectlinks">
@@ -34,11 +34,11 @@
         <span class="drop-sub">of klik om te kiezen</span>
       </label>
       <div class="simple-row">
-        <button id="load-example" type="button" class="badge-button">Voorbeeld: brunk.mp3</button>
+        <button id="load-example" type="button" class="badge-button">Laad voorbeeld (brunk.mp3)</button>
         <label class="moments-label"><span>Aantal momenten</span><input id="moments" type="range" min="1" max="10" step="1" value="8" /><span class="value" id="moments-value">8</span></label>
-        <span class="hint" id="status">Alles gebeurt lokaal in de browser.</span>
+        <span class="status" id="status" role="status" aria-live="polite">Alles gebeurt lokaal in de browser.</span>
       </div>
-      <div class="progress" id="progress" hidden><div class="progress-bar" id="progress-bar"></div><span id="progress-text">decoderen…</span></div>
+      <div class="progress-row" id="progress" hidden><progress id="progress-bar" max="1" aria-labelledby="progress-text"></progress><span id="progress-text" class="hint">decoderen…</span></div>
     </section>
 
     <section class="simple-step" id="result" hidden>
@@ -64,7 +64,7 @@
         <textarea id="code" class="output" readonly spellcheck="false" wrap="off"></textarea>
       </div>
       <div class="simple-col">
-        <div class="editor-bar"><span class="hint">zo ziet het eruit · klik in het beeld om te starten</span><button id="rerun" type="button">Opnieuw</button></div>
+        <div class="editor-bar"><span class="hint">zo ziet het eruit · klik in het beeld om te starten</span><button id="rerun" type="button">Start preview opnieuw</button></div>
         <iframe id="preview" title="Preview van de sketch"></iframe>
       </div>
     </section>
@@ -76,6 +76,6 @@
 
   <script src="soundline-analysis.js?v=4"></script>
   <script src="soundline-codegen.js?v=6"></script>
-  <script src="voorbeeld.js?v=2"></script>
+  <script src="voorbeeld.js?v=3"></script>
 </body>
 </html>
